@@ -313,10 +313,6 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 
 	// Determine which keys to use for validation
 	validationKeys := cm.validationKeys
-	if len(validationKeys) == 0 {
-		// If no validation keys are set, derive from signing key
-		validationKeys = []interface{}{deriveValidationKey(cm.signingKey)}
-	}
 
 	// Try to validate with each key (supports key rotation)
 	var lastErr error
@@ -365,19 +361,4 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 		return nil, fmt.Errorf("failed to validate token: %w", lastErr)
 	}
 	return nil, fmt.Errorf("token is invalid")
-}
-
-// deriveValidationKey derives the validation key from the signing key
-// For HMAC, it's the same key; for RSA/ECDSA, it's the public key
-func deriveValidationKey(signingKey interface{}) interface{} {
-	switch key := signingKey.(type) {
-	case []byte:
-		return key
-	case *rsa.PrivateKey:
-		return &key.PublicKey
-	case *ecdsa.PrivateKey:
-		return &key.PublicKey
-	default:
-		return signingKey
-	}
 }
