@@ -1,6 +1,10 @@
 package jwtcookie
 
 import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -348,7 +352,7 @@ func TestGetClaimsOfValid_KeyRotation(t *testing.T) {
 	// Validate with both old and new keys (key rotation scenario)
 	cm2 := NewCookieManager(
 		WithSigningKey(newKey),                 // New key for signing
-		WithValidationKeys([][]byte{newKey, oldKey}), // Accept both keys for validation
+		WithValidationKeys([]interface{}{newKey, oldKey}), // Accept both keys for validation
 	)
 
 	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -386,7 +390,7 @@ func TestGetClaimsOfValid_MultipleValidationKeys(t *testing.T) {
 	// Validate with multiple keys including key2
 	cm2 := NewCookieManager(
 		WithSigningKey(key3),
-		WithValidationKeys([][]byte{key1, key2, key3}),
+		WithValidationKeys([]interface{}{key1, key2, key3}),
 	)
 
 	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -480,4 +484,184 @@ func TestSetJWTCookie_ConfigurableSigningMethod(t *testing.T) {
 	})
 	require.NoError(t, err)
 	assert.Equal(t, "HS512", token512.Header["alg"])
+}
+
+func TestSetJWTCookie_RSAAlgorithm(t *testing.T) {
+	// Generate RSA key pair for testing (1024-bit for faster tests)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+
+	// Test with RS256
+	cm := NewCookieManager(
+		WithSigningKey(privateKey),
+		WithSigningMethod(jwt.SigningMethodRS256),
+	)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	customClaims := map[string]string{
+		"user_id": "rsa-test",
+		"alg":     "RS256",
+	}
+
+	err = cm.SetJWTCookie(w, r, customClaims)
+	require.NoError(t, err)
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+
+	// Parse and verify the JWT token with public key
+	token, err := jwt.Parse(cookies[0].Value, func(token *jwt.Token) (interface{}, error) {
+		return &privateKey.PublicKey, nil
+	})
+	require.NoError(t, err)
+	require.True(t, token.Valid)
+	assert.Equal(t, "RS256", token.Header["alg"])
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	require.True(t, ok)
+	assert.Equal(t, "rsa-test", claims["user_id"])
+}
+
+func TestSetJWTCookie_ECDSAAlgorithm(t *testing.T) {
+	// Generate ECDSA key pair for testing
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	// Test with ES256
+	cm := NewCookieManager(
+		WithSigningKey(privateKey),
+		WithSigningMethod(jwt.SigningMethodES256),
+	)
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	customClaims := map[string]string{
+		"user_id": "ecdsa-test",
+		"alg":     "ES256",
+	}
+
+	err = cm.SetJWTCookie(w, r, customClaims)
+	require.NoError(t, err)
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+
+	// Parse and verify the JWT token with public key
+	token, err := jwt.Parse(cookies[0].Value, func(token *jwt.Token) (interface{}, error) {
+		return &privateKey.PublicKey, nil
+	})
+	require.NoError(t, err)
+	require.True(t, token.Valid)
+	assert.Equal(t, "ES256", token.Header["alg"])
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	require.True(t, ok)
+	assert.Equal(t, "ecdsa-test", claims["user_id"])
+}
+
+func TestGetClaimsOfValid_RSA(t *testing.T) {
+	// Generate RSA key pair (1024-bit for faster tests)
+	privateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+
+	cm := NewCookieManager(
+		WithSigningKey(privateKey),
+		WithSigningMethod(jwt.SigningMethodRS256),
+	)
+
+	// Set cookie
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	customClaims := map[string]string{
+		"user_id": "rsa-validation-test",
+	}
+
+	err = cm.SetJWTCookie(w, r, customClaims)
+	require.NoError(t, err)
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+
+	// Validate cookie
+	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	r2.AddCookie(cookies[0])
+
+	claims, err := cm.GetClaimsOfValid(r2)
+	require.NoError(t, err)
+	require.NotNil(t, claims)
+	assert.Equal(t, "rsa-validation-test", claims["user_id"])
+}
+
+func TestGetClaimsOfValid_ECDSA(t *testing.T) {
+	// Generate ECDSA key pair
+	privateKey, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	require.NoError(t, err)
+
+	cm := NewCookieManager(
+		WithSigningKey(privateKey),
+		WithSigningMethod(jwt.SigningMethodES256),
+	)
+
+	// Set cookie
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	customClaims := map[string]string{
+		"user_id": "ecdsa-validation-test",
+	}
+
+	err = cm.SetJWTCookie(w, r, customClaims)
+	require.NoError(t, err)
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+
+	// Validate cookie
+	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	r2.AddCookie(cookies[0])
+
+	claims, err := cm.GetClaimsOfValid(r2)
+	require.NoError(t, err)
+	require.NotNil(t, claims)
+	assert.Equal(t, "ecdsa-validation-test", claims["user_id"])
+}
+
+func TestGetClaimsOfValid_RSAKeyRotation(t *testing.T) {
+	// Generate two RSA key pairs (1024-bit for faster tests)
+	oldPrivateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+	newPrivateKey, err := rsa.GenerateKey(rand.Reader, 1024)
+	require.NoError(t, err)
+
+	// Create token with old key
+	cm1 := NewCookieManager(
+		WithSigningKey(oldPrivateKey),
+		WithSigningMethod(jwt.SigningMethodRS256),
+	)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+
+	err = cm1.SetJWTCookie(w, r, map[string]string{"user_id": "rotation-test"})
+	require.NoError(t, err)
+
+	cookies := w.Result().Cookies()
+	require.Len(t, cookies, 1)
+
+	// Validate with both old and new public keys
+	cm2 := NewCookieManager(
+		WithSigningKey(newPrivateKey),
+		WithSigningMethod(jwt.SigningMethodRS256),
+		WithValidationKeys([]interface{}{&newPrivateKey.PublicKey, &oldPrivateKey.PublicKey}),
+	)
+
+	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	r2.AddCookie(cookies[0])
+
+	claims, err := cm2.GetClaimsOfValid(r2)
+	require.NoError(t, err)
+	require.NotNil(t, claims)
+	assert.Equal(t, "rotation-test", claims["user_id"])
 }

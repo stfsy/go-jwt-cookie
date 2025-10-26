@@ -85,11 +85,61 @@ newKey := []byte("new-signing-key")
 
 manager := jwtcookie.NewCookieManager(
 	jwtcookie.WithSigningKey(newKey),  // New key for signing
-	jwtcookie.WithValidationKeys([][]byte{newKey, oldKey}),  // Accept both keys for validation
+	jwtcookie.WithValidationKeys([]interface{}{newKey, oldKey}),  // Accept both keys for validation
 )
 
 // New tokens will be signed with newKey
 // Old tokens signed with oldKey will still validate successfully
+```
+
+## RSA and ECDSA Examples
+
+### Using RSA Keys
+
+```go
+import (
+	"crypto/rand"
+	"crypto/rsa"
+	
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/stfsy/go-jwt-cookie"
+)
+
+// Generate RSA key pair
+privateKey, _ := rsa.GenerateKey(rand.Reader, 2048)
+
+manager := jwtcookie.NewCookieManager(
+	jwtcookie.WithSigningKey(privateKey),
+	jwtcookie.WithSigningMethod(jwt.SigningMethodRS256),
+)
+
+// For validation with public keys only
+manager := jwtcookie.NewCookieManager(
+	jwtcookie.WithSigningKey(privateKey),
+	jwtcookie.WithSigningMethod(jwt.SigningMethodRS256),
+	jwtcookie.WithValidationKeys([]interface{}{&privateKey.PublicKey}),
+)
+```
+
+### Using ECDSA Keys
+
+```go
+import (
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/stfsy/go-jwt-cookie"
+)
+
+// Generate ECDSA key pair
+privateKey, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+
+manager := jwtcookie.NewCookieManager(
+	jwtcookie.WithSigningKey(privateKey),
+	jwtcookie.WithSigningMethod(jwt.SigningMethodES256),
+)
 ```
 ```
 
@@ -104,9 +154,18 @@ The cookie manager supports the following configuration options:
 - `WithDomain(string)` — sets the cookie domain
 - `WithPath(string)` — sets the cookie path
 - `WithCookieName(string)` — sets a custom cookie name
-- `WithSigningKey([]byte)` — sets the signing key for signing JWTs
-- `WithValidationKeys([][]byte)` — sets multiple signing keys for validation (supports key rotation)
-- `WithSigningMethod(jwt.SigningMethod)` — sets the JWT signing algorithm (default: HS256; supported: HS256, HS384, HS512)
+- `WithSigningKey(interface{})` — sets the signing key for signing JWTs
+  - For HMAC (HS256, HS384, HS512): pass `[]byte`
+  - For RSA (RS256, RS384, RS512, PS256, PS384, PS512): pass `*rsa.PrivateKey`
+  - For ECDSA (ES256, ES384, ES512): pass `*ecdsa.PrivateKey`
+- `WithValidationKeys([]interface{})` — sets multiple keys for validation (supports key rotation)
+  - For HMAC: pass `[][]byte`
+  - For RSA: pass `[]*rsa.PublicKey`
+  - For ECDSA: pass `[]*ecdsa.PublicKey`
+- `WithSigningMethod(jwt.SigningMethod)` — sets the JWT signing algorithm
+  - HMAC: HS256 (default), HS384, HS512
+  - RSA: RS256, RS384, RS512, PS256, PS384, PS512
+  - ECDSA: ES256, ES384, ES512
 
 ## Testing
 

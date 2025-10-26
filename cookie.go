@@ -1,6 +1,8 @@
 package jwtcookie
 
 import (
+	"crypto/ecdsa"
+	"crypto/rsa"
 	"fmt"
 	"net/http"
 	"time"
@@ -17,8 +19,8 @@ type CookieManager struct {
 	domain         string
 	path           string
 	cookieName     string
-	signingKey     []byte              // Used for signing
-	validationKeys [][]byte            // Used for validation (supports key rotation)
+	signingKey     interface{}   // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
+	validationKeys []interface{} // Used for validation (supports key rotation)
 	signingMethod  jwt.SigningMethod   // JWT signing algorithm
 }
 
@@ -75,7 +77,10 @@ func WithCookieName(name string) Option {
 }
 
 // WithSigningKey sets the signing key for signing JWTs
-func WithSigningKey(key []byte) Option {
+// For HMAC algorithms (HS256, HS384, HS512): pass []byte
+// For RSA algorithms (RS256, RS384, RS512, PS256, PS384, PS512): pass *rsa.PrivateKey
+// For ECDSA algorithms (ES256, ES384, ES512): pass *ecdsa.PrivateKey
+func WithSigningKey(key interface{}) Option {
 	return func(cm *CookieManager) {
 		cm.signingKey = key
 	}
@@ -83,14 +88,20 @@ func WithSigningKey(key []byte) Option {
 
 // WithValidationKeys sets the signing keys for validating JWTs (supports key rotation)
 // If not set, the signing key will be used for validation
-func WithValidationKeys(keys [][]byte) Option {
+// For HMAC algorithms: pass [][]byte
+// For RSA algorithms: pass []*rsa.PublicKey
+// For ECDSA algorithms: pass []*ecdsa.PublicKey
+func WithValidationKeys(keys []interface{}) Option {
 	return func(cm *CookieManager) {
 		cm.validationKeys = keys
 	}
 }
 
 // WithSigningMethod sets the JWT signing algorithm (default: HS256)
-// Supported methods: HS256, HS384, HS512
+// Supported methods:
+// - HMAC: HS256, HS384, HS512
+// - RSA: RS256, RS384, RS512, PS256, PS384, PS512
+// - ECDSA: ES256, ES384, ES512
 func WithSigningMethod(method jwt.SigningMethod) Option {
 	return func(cm *CookieManager) {
 		cm.signingMethod = method
@@ -172,16 +183,29 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 	// Determine which keys to use for validation
 	validationKeys := cm.validationKeys
 	if len(validationKeys) == 0 {
-		// If no validation keys are set, use the signing key
-		validationKeys = [][]byte{cm.signingKey}
+		// If no validation keys are set, derive from signing key
+		validationKeys = []interface{}{deriveValidationKey(cm.signingKey)}
 	}
 
 	// Try to validate with each key (supports key rotation)
 	var lastErr error
 	for _, key := range validationKeys {
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-			// Verify the signing method is HMAC
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+			// Verify the signing method matches expected type
+			switch token.Method.(type) {
+			case *jwt.SigningMethodHMAC:
+				if _, ok := key.([]byte); !ok {
+					return nil, fmt.Errorf("HMAC signing method requires []byte key")
+				}
+			case *jwt.SigningMethodRSA, *jwt.SigningMethodRSAPSS:
+				if _, ok := key.(*rsa.PublicKey); !ok {
+					return nil, fmt.Errorf("RSA signing method requires *rsa.PublicKey")
+				}
+			case *jwt.SigningMethodECDSA:
+				if _, ok := key.(*ecdsa.PublicKey); !ok {
+					return nil, fmt.Errorf("ECDSA signing method requires *ecdsa.PublicKey")
+				}
+			default:
 				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
 			}
 			return key, nil
@@ -210,4 +234,19 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 		return nil, fmt.Errorf("failed to validate token: %w", lastErr)
 	}
 	return nil, fmt.Errorf("token is invalid")
+}
+
+// deriveValidationKey derives the validation key from the signing key
+// For HMAC, it's the same key; for RSA/ECDSA, it's the public key
+func deriveValidationKey(signingKey interface{}) interface{} {
+	switch key := signingKey.(type) {
+	case []byte:
+		return key
+	case *rsa.PrivateKey:
+		return &key.PublicKey
+	case *ecdsa.PrivateKey:
+		return &key.PublicKey
+	default:
+		return signingKey
+	}
 }

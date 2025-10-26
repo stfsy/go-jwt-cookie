@@ -15,7 +15,7 @@ Big picture
 - Internal model: CookieManager holds configuration for cookie attributes (secure, httpOnly, maxAge, sameSite, etc.) and signing keys for signing/validating JWTs.
 - JWT tokens include standard claims (iat, exp, nbf) and custom claims provided by the caller.
 - Supports key rotation: one key for signing, multiple keys for validation.
-- Configurable JWT signing algorithm (HS256, HS384, HS512).
+- Configurable JWT signing algorithm (HMAC: HS256, HS384, HS512; RSA: RS256, RS384, RS512, PS256, PS384, PS512; ECDSA: ES256, ES384, ES512).
 
 Important behaviors & examples (copy/paste-ready)
 - Default cookie settings: httpOnly=true, secure=false, maxAge=3600 (1 hour), sameSite=Lax, path="/"
@@ -24,8 +24,15 @@ Important behaviors & examples (copy/paste-ready)
 - Default signing algorithm: HS256 (can be changed using `WithSigningMethod()`)
 - `SetJWTCookie` creates a JWT with standard claims and custom claims from the provided map, then sets it as an HTTP cookie
 - `GetClaimsOfValid` validates a JWT token from the request cookie and returns the claims map
-- JWT signing algorithms: HS256 (default), HS384, HS512
-- Key rotation: use `WithValidationKeys([][]byte{newKey, oldKey})` to accept multiple keys for validation while signing with the primary key
+- JWT signing algorithms: 
+  - HMAC: HS256 (default), HS384, HS512
+  - RSA: RS256, RS384, RS512, PS256, PS384, PS512
+  - ECDSA: ES256, ES384, ES512
+- Key rotation: use `WithValidationKeys([]interface{}{newKey, oldKey})` to accept multiple keys for validation while signing with the primary key
+- Key types:
+  - HMAC algorithms: `[]byte` for signing, `[]byte` for validation
+  - RSA algorithms: `*rsa.PrivateKey` for signing, `*rsa.PublicKey` for validation
+  - ECDSA algorithms: `*ecdsa.PrivateKey` for signing, `*ecdsa.PublicKey` for validation
 
 Security notes for agents
 - Always recommend using `WithSigningKey()` to set a strong, unique signing key
@@ -46,8 +53,9 @@ Patterns to follow when editing
 - Keep public API surface minimal: functions/types exported only when needed by consumers.
 - Use the functional options pattern for configuration (see existing `WithXxx` functions)
 - When adding tests, use `testify/assert` and `testify/require` as in existing tests
-- Maintain high test coverage (currently 93.1%)
+- Maintain high test coverage (currently 88.7%)
 - Add fuzz tests for any new public functions that accept external input
+- For RSA key generation in tests, use 1024-bit keys to keep tests fast (2s timeout)
 
 Integration points & dependencies
 - `github.com/golang-jwt/jwt/v5` — JWT token generation and signing
