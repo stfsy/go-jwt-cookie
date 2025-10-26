@@ -20,7 +20,7 @@ func FuzzSetJWTCookie(f *testing.F) {
 			return
 		}
 
-		cm := NewCookieManager(WithSigningKey(signingKey))
+	cm := NewCookieManager(WithSigningKeyHMAC(signingKey))
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -69,7 +69,7 @@ func FuzzGetClaimsOfValid(f *testing.F) {
 		}
 
 		cm := NewCookieManager(
-			WithSigningKey(signingKey),
+			WithSigningKeyHMAC(signingKey),
 			WithCookieName(cookieName),
 		)
 
@@ -107,7 +107,7 @@ func FuzzRoundTrip(f *testing.F) {
 			return
 		}
 
-		cm := NewCookieManager(WithSigningKey(signingKey))
+	cm := NewCookieManager(WithSigningKeyHMAC(signingKey))
 
 		// Set cookie
 		w := httptest.NewRecorder()

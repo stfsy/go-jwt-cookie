@@ -76,11 +76,23 @@ func WithCookieName(name string) Option {
 	}
 }
 
-// WithSigningKey sets the signing key for signing JWTs
-// For HMAC algorithms (HS256, HS384, HS512): pass []byte
-// For RSA algorithms (RS256, RS384, RS512, PS256, PS384, PS512): pass *rsa.PrivateKey
-// For ECDSA algorithms (ES256, ES384, ES512): pass *ecdsa.PrivateKey
-func WithSigningKey(key interface{}) Option {
+// Typed signing key helpers for type-safety
+// WithSigningKeyHMAC sets an HMAC signing key (HS256/HS384/HS512)
+func WithSigningKeyHMAC(key []byte) Option {
+	return func(cm *CookieManager) {
+		cm.signingKey = key
+	}
+}
+
+// WithSigningKeyRSA sets an RSA signing key (private key for RS*/PS*)
+func WithSigningKeyRSA(key *rsa.PrivateKey) Option {
+	return func(cm *CookieManager) {
+		cm.signingKey = key
+	}
+}
+
+// WithSigningKeyECDSA sets an ECDSA signing key (private key for ES*)
+func WithSigningKeyECDSA(key *ecdsa.PrivateKey) Option {
 	return func(cm *CookieManager) {
 		cm.signingKey = key
 	}
@@ -97,6 +109,40 @@ func WithValidationKeys(keys []interface{}) Option {
 	}
 }
 
+// Typed validation key helpers for type-safety
+// WithValidationKeysHMAC accepts a slice of HMAC keys
+func WithValidationKeysHMAC(keys [][]byte) Option {
+	iface := make([]interface{}, len(keys))
+	for i, k := range keys {
+		iface[i] = k
+	}
+	return func(cm *CookieManager) {
+		cm.validationKeys = iface
+	}
+}
+
+// WithValidationKeysRSA accepts a slice of RSA public keys
+func WithValidationKeysRSA(keys []*rsa.PublicKey) Option {
+	iface := make([]interface{}, len(keys))
+	for i, k := range keys {
+		iface[i] = k
+	}
+	return func(cm *CookieManager) {
+		cm.validationKeys = iface
+	}
+}
+
+// WithValidationKeysECDSA accepts a slice of ECDSA public keys
+func WithValidationKeysECDSA(keys []*ecdsa.PublicKey) Option {
+	iface := make([]interface{}, len(keys))
+	for i, k := range keys {
+		iface[i] = k
+	}
+	return func(cm *CookieManager) {
+		cm.validationKeys = iface
+	}
+}
+
 // WithSigningMethod sets the JWT signing algorithm (default: HS256)
 // Supported methods:
 // - HMAC: HS256, HS384, HS512
@@ -107,6 +153,23 @@ func WithSigningMethod(method jwt.SigningMethod) Option {
 		cm.signingMethod = method
 	}
 }
+
+// Typesafe helpers for signing methods
+func WithSigningMethodHS256() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS256 } }
+func WithSigningMethodHS384() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS384 } }
+func WithSigningMethodHS512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS512 } }
+
+func WithSigningMethodRS256() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS256 } }
+func WithSigningMethodRS384() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS384 } }
+func WithSigningMethodRS512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS512 } }
+
+func WithSigningMethodPS256() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS256 } }
+func WithSigningMethodPS384() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS384 } }
+func WithSigningMethodPS512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS512 } }
+
+func WithSigningMethodES256() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES256 } }
+func WithSigningMethodES384() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES384 } }
+func WithSigningMethodES512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES512 } }
 
 // NewCookieManager creates a new CookieManager with the given options
 func NewCookieManager(opts ...Option) *CookieManager {
