@@ -304,7 +304,7 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, customClaims map[string]string) error {
 	// Create JWT claims with standard fields
 	now := time.Now()
-	claims := jwt.MapClaims{}
+	claims := make(jwt.MapClaims, len(customClaims)+6)
 
 	// Add custom claims first (may include reserved names); we'll re-assert reserved ones below
 	for key, value := range customClaims {
@@ -318,6 +318,7 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 	claims["iss"] = cm.issuer                                              // Issuer
 	claims["aud"] = cm.audience                                            // Audience
 	claims["sub"] = cm.subject                                             // Subject
+	// when adding new claims, update also the preallocated map size above
 
 	// Create the JWT token
 	token := jwt.NewWithClaims(cm.signingMethod, claims)
