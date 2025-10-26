@@ -11,36 +11,41 @@ Key files
 - `lint.sh` — runs golangci-lint in Docker
 
 Big picture
-- Single package, no server: the library provides `NewCookieManager(opts...)` for creating a cookie manager with configurable options.
+- Single package, no server: the library provides `NewCookieManager(opts...)` which now returns `(*CookieManager, error)` and validates configuration on construction.
 - Internal model: CookieManager holds configuration for cookie attributes (secure, httpOnly, maxAge, sameSite, etc.) and signing keys for signing/validating JWTs.
 - JWT tokens include standard claims (iat, exp, nbf) and custom claims provided by the caller.
 - Supports key rotation: one key for signing, multiple keys for validation.
 - Configurable JWT signing algorithm (HMAC: HS256, HS384, HS512; RSA: RS256, RS384, RS512, PS256, PS384, PS512; ECDSA: ES256, ES384, ES512).
 
 Important behaviors & examples (copy/paste-ready)
-- Default cookie settings: httpOnly=true, secure=false, maxAge=3600 (1 hour), sameSite=Lax, path="/"
+- Default cookie settings: httpOnly=true, secure=true, maxAge=3600 (1 hour), sameSite=Strict, path="/"
 - Default cookie name: "jwt_token"
-- Default signing key: "INSECURE-DEFAULT-KEY-PLEASE-CHANGE" (should be overridden in production using `WithSigningKey()`)
-- Default signing algorithm: HS256 (can be changed using `WithSigningMethod()`)
+- Signing key: set explicitly using typed helpers (see below). The constructor will return an error if signing key/method/validation keys are not correctly provided.
 - `SetJWTCookie` creates a JWT with standard claims and custom claims from the provided map, then sets it as an HTTP cookie
 - `GetClaimsOfValid` validates a JWT token from the request cookie and returns the claims map
 - JWT signing algorithms: 
-  - HMAC: HS256 (default), HS384, HS512
+  - HMAC: HS256, HS384, HS512
   - RSA: RS256, RS384, RS512, PS256, PS384, PS512
   - ECDSA: ES256, ES384, ES512
-- Key rotation: use `WithValidationKeys([]interface{}{newKey, oldKey})` to accept multiple keys for validation while signing with the primary key
-- Key types:
-  - HMAC algorithms: `[]byte` for signing, `[]byte` for validation
-  - RSA algorithms: `*rsa.PrivateKey` for signing, `*rsa.PublicKey` for validation
-  - ECDSA algorithms: `*ecdsa.PrivateKey` for signing, `*ecdsa.PublicKey` for validation
+- Key rotation: use typed helpers to pass validation keys for rotation
+
+Typed helpers (preferred)
+- Signing keys:
+  - `WithSigningKeyHMAC([]byte)` — HMAC signing key
+  - `WithSigningKeyRSA(*rsa.PrivateKey)` — RSA private key for signing (RS*/PS*)
+  - `WithSigningKeyECDSA(*ecdsa.PrivateKey)` — ECDSA private key for signing (ES*)
+- Validation keys (key rotation):
+  - `WithValidationKeysHMAC([][]byte)` — HMAC validation keys
+  - `WithValidationKeysRSA([]*rsa.PublicKey)` — RSA public keys for validation
+  - `WithValidationKeysECDSA([]*ecdsa.PublicKey)` — ECDSA public keys for validation
+- Signing methods (typed helpers): `WithSigningMethodHS256()`, `WithSigningMethodRS256()`, `WithSigningMethodPS256()`, `WithSigningMethodES256()`, etc.
 
 Security notes for agents
-- Always recommend using `WithSigningKey()` to set a strong, unique signing key
-- The default signing key is intentionally weak to encourage explicit configuration
+- Always recommend using the typed signing-key helpers to set a strong, unique signing key
 - Recommend `WithSecure(true)` for production environments (HTTPS)
 - Recommend `WithHTTPOnly(true)` to prevent XSS attacks
 - Consider `WithSameSite(http.SameSiteStrictMode)` for CSRF protection
-- Recommend appropriate signing algorithm based on security requirements (HS256 is default, HS512 for higher security)
+- Recommend appropriate signing algorithm based on security requirements (HS256 is acceptable, HS512/RSAPSS/ES512 for higher assurance)
 
 Developer workflows
 - Build: `go build ./...`
@@ -53,7 +58,7 @@ Patterns to follow when editing
 - Keep public API surface minimal: functions/types exported only when needed by consumers.
 - Use the functional options pattern for configuration (see existing `WithXxx` functions)
 - When adding tests, use `testify/assert` and `testify/require` as in existing tests
-- Maintain high test coverage (currently 88.7%)
+- Maintain high test coverage (aim for >80%)
 - Add fuzz tests for any new public functions that accept external input
 - For RSA key generation in tests, use 1024-bit keys to keep tests fast (2s timeout)
 
@@ -64,3 +69,4 @@ Integration points & dependencies
 
 Commit guidelines
 - Use Conventional Commits for changes (e.g., `fix(cookie): prevent nil pointer in SetJWTCookie`).
+```
