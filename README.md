@@ -5,7 +5,9 @@ A lightweight Go package for creating JWT tokens and setting them as HTTP cookie
 This library is intended to be embedded into HTTP servers for authentication and session management. It offers:
 
 - JWT token generation with standard and custom claims
+- JWT token validation and claims extraction
 - Configurable cookie options (secure, httpOnly, sameSite, etc.)
+- Secret key rotation support for seamless key updates
 - Simple constructor-based configuration pattern
 
 ## Installation
@@ -56,8 +58,39 @@ func main() {
 		w.Write([]byte("JWT cookie set successfully"))
 	})
 
+	http.HandleFunc("/protected", func(w http.ResponseWriter, r *http.Request) {
+		// Validate JWT and get claims
+		claims, err := manager.GetClaimsOfValid(r)
+		if err != nil {
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		userID := claims["user_id"]
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte("Welcome, user: " + userID.(string)))
+	})
+
 	http.ListenAndServe(":8080", nil)
 }
+```
+
+## Key Rotation
+
+The library supports secret key rotation, allowing you to validate tokens signed with old keys while signing new tokens with a new key:
+
+```go
+oldKey := []byte("old-secret-key")
+newKey := []byte("new-secret-key")
+
+manager := jwtcookie.NewCookieManager(
+	jwtcookie.WithSecretKey(newKey),  // New key for signing
+	jwtcookie.WithValidationKeys([][]byte{newKey, oldKey}),  // Accept both keys for validation
+)
+
+// New tokens will be signed with newKey
+// Old tokens signed with oldKey will still validate successfully
+```
 ```
 
 ## Configuration Options
@@ -70,6 +103,9 @@ The cookie manager supports the following configuration options:
 - `WithSameSite(http.SameSite)` — sets the SameSite attribute
 - `WithDomain(string)` — sets the cookie domain
 - `WithPath(string)` — sets the cookie path
+- `WithCookieName(string)` — sets a custom cookie name
+- `WithSecretKey([]byte)` — sets the secret key for signing JWTs
+- `WithValidationKeys([][]byte)` — sets multiple secret keys for validation (supports key rotation)
 
 ## Testing
 
@@ -83,6 +119,14 @@ Or use the included test script:
 
 ```bash
 ./test.sh
+```
+
+## Fuzzing
+
+Fuzz tests are provided to ensure robustness. Run them with:
+
+```bash
+./fuzz.sh
 ```
 
 ## Security Considerations

@@ -12,3 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Constructor function for cookie manager with configurable options
 - Support for setting cookie secure flag
 - Function to create JWT from HTTP request and custom claims map
+- `GetClaimsOfValid` function to validate JWT tokens and extract claims
+- Secret key rotation support via `WithValidationKeys` option
+- Fuzz tests for `SetJWTCookie`, `GetClaimsOfValid`, and round-trip testing
+- Comprehensive test coverage for key rotation scenarios

@@ -10,14 +10,15 @@ import (
 
 // CookieManager manages JWT cookie creation and configuration
 type CookieManager struct {
-	secure      bool
-	httpOnly    bool
-	maxAge      int
-	sameSite    http.SameSite
-	domain      string
-	path        string
-	cookieName  string
-	secretKey   []byte
+	secure         bool
+	httpOnly       bool
+	maxAge         int
+	sameSite       http.SameSite
+	domain         string
+	path           string
+	cookieName     string
+	secretKey      []byte   // Used for signing
+	validationKeys [][]byte // Used for validation (supports key rotation)
 }
 
 // Option is a function that configures a CookieManager
@@ -76,6 +77,14 @@ func WithCookieName(name string) Option {
 func WithSecretKey(key []byte) Option {
 	return func(cm *CookieManager) {
 		cm.secretKey = key
+	}
+}
+
+// WithValidationKeys sets the secret keys for validating JWTs (supports key rotation)
+// If not set, the signing key will be used for validation
+func WithValidationKeys(keys [][]byte) Option {
+	return func(cm *CookieManager) {
+		cm.validationKeys = keys
 	}
 }
 
@@ -138,4 +147,57 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 
 	http.SetCookie(w, cookie)
 	return nil
+}
+
+// GetClaimsOfValid validates the JWT token from the request cookie and returns the claims
+func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface{}, error) {
+	// Get the cookie from the request
+	cookie, err := r.Cookie(cm.cookieName)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get cookie: %w", err)
+	}
+
+	tokenString := cookie.Value
+
+	// Determine which keys to use for validation
+	validationKeys := cm.validationKeys
+	if len(validationKeys) == 0 {
+		// If no validation keys are set, use the signing key
+		validationKeys = [][]byte{cm.secretKey}
+	}
+
+	// Try to validate with each key (supports key rotation)
+	var lastErr error
+	for _, key := range validationKeys {
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			// Verify the signing method is HMAC
+			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+			}
+			return key, nil
+		})
+
+		if err == nil && token.Valid {
+			// Successfully validated with this key
+			claims, ok := token.Claims.(jwt.MapClaims)
+			if !ok {
+				return nil, fmt.Errorf("failed to parse claims")
+			}
+
+			// Convert jwt.MapClaims to map[string]interface{}
+			result := make(map[string]interface{})
+			for k, v := range claims {
+				result[k] = v
+			}
+			return result, nil
+		}
+
+		lastErr = err
+	}
+
+	// None of the keys validated the token
+	if lastErr != nil {
+		return nil, fmt.Errorf("failed to validate token: %w", lastErr)
+	}
+	return nil, fmt.Errorf("token is invalid")
 }
