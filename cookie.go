@@ -12,19 +12,22 @@ import (
 
 // CookieManager manages JWT cookie creation and configuration
 type CookieManager struct {
-	secure         bool
-	httpOnly       bool
-	maxAge         int
-	sameSite       http.SameSite
-	domain         string
-	path           string
-	cookieName     string
-	issuer         string
-	audience       string
-	subject        string
-	signingKey     interface{}       // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
-	validationKeys []interface{}     // Used for validation (supports key rotation)
-	signingMethod  jwt.SigningMethod // JWT signing algorithm
+	secure     bool
+	httpOnly   bool
+	maxAge     int
+	sameSite   http.SameSite
+	domain     string
+	path       string
+	cookieName string
+	issuer     string
+	audience   string
+	subject    string
+	signingKey interface{} // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
+	// Typed validation keys for key rotation (avoid boxing/rt type assertions)
+	validationKeysHMAC  [][]byte
+	validationKeysRSA   []*rsa.PublicKey
+	validationKeysECDSA []*ecdsa.PublicKey
+	signingMethod       jwt.SigningMethod // JWT signing algorithm
 }
 
 // Option is a function that configures a CookieManager
@@ -137,34 +140,22 @@ func WithSigningKeyECDSA(key *ecdsa.PrivateKey) Option {
 // - HS512: at least 64 bytes
 // All validation keys must satisfy the minimum for the configured signing method.
 func WithValidationKeysHMAC(keys [][]byte) Option {
-	iface := make([]interface{}, len(keys))
-	for i, k := range keys {
-		iface[i] = k
-	}
 	return func(cm *CookieManager) {
-		cm.validationKeys = iface
+		cm.validationKeysHMAC = keys
 	}
 }
 
 // WithValidationKeysRSA accepts a slice of RSA public keys
 func WithValidationKeysRSA(keys []*rsa.PublicKey) Option {
-	iface := make([]interface{}, len(keys))
-	for i, k := range keys {
-		iface[i] = k
-	}
 	return func(cm *CookieManager) {
-		cm.validationKeys = iface
+		cm.validationKeysRSA = keys
 	}
 }
 
 // WithValidationKeysECDSA accepts a slice of ECDSA public keys
 func WithValidationKeysECDSA(keys []*ecdsa.PublicKey) Option {
-	iface := make([]interface{}, len(keys))
-	for i, k := range keys {
-		iface[i] = k
-	}
 	return func(cm *CookieManager) {
-		cm.validationKeys = iface
+		cm.validationKeysECDSA = keys
 	}
 }
 
@@ -252,11 +243,12 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		return nil, fmt.Errorf("signing method must be specified")
 	} else if cm.signingKey == nil {
 		return nil, fmt.Errorf("signing key must be specified")
-	} else if len(cm.validationKeys) == 0 {
-		return nil, fmt.Errorf("at least one validation key must be specified")
 	} else if cm.signingMethod == jwt.SigningMethodHS256 ||
 		cm.signingMethod == jwt.SigningMethodHS384 ||
 		cm.signingMethod == jwt.SigningMethodHS512 {
+		if len(cm.validationKeysHMAC) == 0 {
+			return nil, fmt.Errorf("at least one validation key must be specified")
+		}
 		keyBytes, ok := cm.signingKey.([]byte)
 		if !ok {
 			return nil, fmt.Errorf("HMAC signing method requires []byte signing key")
@@ -275,11 +267,7 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		if len(keyBytes) < minLen {
 			return nil, fmt.Errorf("HMAC signing key too short for %s: got %d bytes, require at least %d bytes", cm.signingMethod.Alg(), len(keyBytes), minLen)
 		}
-		for _, key := range cm.validationKeys {
-			kb, ok := key.([]byte)
-			if !ok {
-				return nil, fmt.Errorf("HMAC validation keys must be of type []byte")
-			}
+		for _, kb := range cm.validationKeysHMAC {
 			if len(kb) < minLen {
 				return nil, fmt.Errorf("HMAC validation key too short for %s: got %d bytes, require at least %d bytes", cm.signingMethod.Alg(), len(kb), minLen)
 			}
@@ -290,27 +278,23 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		cm.signingMethod == jwt.SigningMethodPS256 ||
 		cm.signingMethod == jwt.SigningMethodPS384 ||
 		cm.signingMethod == jwt.SigningMethodPS512 {
+		if len(cm.validationKeysRSA) == 0 {
+			return nil, fmt.Errorf("at least one validation key must be specified")
+		}
 		if _, ok := cm.signingKey.(*rsa.PrivateKey); !ok {
 			return nil, fmt.Errorf("RSA signing method requires *rsa.PrivateKey signing key")
 		}
-		// check validation keys are of type public key
-		for _, key := range cm.validationKeys {
-			if _, ok := key.(*rsa.PublicKey); !ok {
-				return nil, fmt.Errorf("RSA validation keys must be of type *rsa.PublicKey")
-			}
-		}
+		// validation keys are typed; no runtime checks needed here
 	} else if cm.signingMethod == jwt.SigningMethodES256 ||
 		cm.signingMethod == jwt.SigningMethodES384 ||
 		cm.signingMethod == jwt.SigningMethodES512 {
+		if len(cm.validationKeysECDSA) == 0 {
+			return nil, fmt.Errorf("at least one validation key must be specified")
+		}
 		if _, ok := cm.signingKey.(*ecdsa.PrivateKey); !ok {
 			return nil, fmt.Errorf("ECDSA signing method requires *ecdsa.PrivateKey signing key")
 		}
-		// check validation keys are of type public key
-		for _, key := range cm.validationKeys {
-			if _, ok := key.(*ecdsa.PublicKey); !ok {
-				return nil, fmt.Errorf("ECDSA validation keys must be of type *ecdsa.PublicKey")
-			}
-		}
+		// validation keys are typed; no runtime checks needed here
 	}
 
 	return cm, nil
@@ -370,49 +354,59 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 
 	tokenString := cookie.Value
 
-	// Determine which keys to use for validation
-	validationKeys := cm.validationKeys
-
 	// Try to validate with each key (supports key rotation)
 	var lastErr error
-	for _, key := range validationKeys {
-		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-
-			switch token.Method.(type) {
-			case *jwt.SigningMethodHMAC:
-				if _, ok := key.([]byte); !ok {
-					return nil, fmt.Errorf("HMAC signing method requires []byte key")
+	switch cm.signingMethod {
+	case jwt.SigningMethodHS256, jwt.SigningMethodHS384, jwt.SigningMethodHS512:
+		for _, key := range cm.validationKeysHMAC {
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil }, jwt.WithValidMethods([]string{cm.signingMethod.Alg()}), jwt.WithIssuer(cm.issuer), jwt.WithAudience(cm.audience), jwt.WithSubject(cm.subject))
+			if err == nil && token.Valid {
+				claims, ok := token.Claims.(jwt.MapClaims)
+				if !ok {
+					return nil, fmt.Errorf("failed to parse claims")
 				}
-			case *jwt.SigningMethodRSA, *jwt.SigningMethodRSAPSS:
-				if _, ok := key.(*rsa.PublicKey); !ok {
-					return nil, fmt.Errorf("RSA signing method requires *rsa.PublicKey")
+				result := make(map[string]interface{}, len(claims))
+				for k, v := range claims {
+					result[k] = v
 				}
-			case *jwt.SigningMethodECDSA:
-				if _, ok := key.(*ecdsa.PublicKey); !ok {
-					return nil, fmt.Errorf("ECDSA signing method requires *ecdsa.PublicKey")
-				}
-			default:
-				return nil, fmt.Errorf("unexpected signing method: %v", token.Header["alg"])
+				return result, nil
 			}
-			return key, nil
-		}, jwt.WithValidMethods([]string{cm.signingMethod.Alg()}), jwt.WithIssuer(cm.issuer), jwt.WithAudience(cm.audience), jwt.WithSubject(cm.subject))
-
-		if err == nil && token.Valid {
-			// Successfully validated with this key
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if !ok {
-				return nil, fmt.Errorf("failed to parse claims")
-			}
-
-			// Convert jwt.MapClaims to map[string]interface{}
-			result := make(map[string]interface{})
-			for k, v := range claims {
-				result[k] = v
-			}
-			return result, nil
+			lastErr = err
 		}
-
-		lastErr = err
+	case jwt.SigningMethodRS256, jwt.SigningMethodRS384, jwt.SigningMethodRS512, jwt.SigningMethodPS256, jwt.SigningMethodPS384, jwt.SigningMethodPS512:
+		for _, key := range cm.validationKeysRSA {
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil }, jwt.WithValidMethods([]string{cm.signingMethod.Alg()}), jwt.WithIssuer(cm.issuer), jwt.WithAudience(cm.audience), jwt.WithSubject(cm.subject))
+			if err == nil && token.Valid {
+				claims, ok := token.Claims.(jwt.MapClaims)
+				if !ok {
+					return nil, fmt.Errorf("failed to parse claims")
+				}
+				result := make(map[string]interface{}, len(claims))
+				for k, v := range claims {
+					result[k] = v
+				}
+				return result, nil
+			}
+			lastErr = err
+		}
+	case jwt.SigningMethodES256, jwt.SigningMethodES384, jwt.SigningMethodES512:
+		for _, key := range cm.validationKeysECDSA {
+			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil }, jwt.WithValidMethods([]string{cm.signingMethod.Alg()}), jwt.WithIssuer(cm.issuer), jwt.WithAudience(cm.audience), jwt.WithSubject(cm.subject))
+			if err == nil && token.Valid {
+				claims, ok := token.Claims.(jwt.MapClaims)
+				if !ok {
+					return nil, fmt.Errorf("failed to parse claims")
+				}
+				result := make(map[string]interface{}, len(claims))
+				for k, v := range claims {
+					result[k] = v
+				}
+				return result, nil
+			}
+			lastErr = err
+		}
+	default:
+		return nil, fmt.Errorf("unexpected signing method: %v", cm.signingMethod.Alg())
 	}
 
 	// None of the keys validated the token
