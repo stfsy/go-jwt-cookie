@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for setting cookie secure flag
 - Function to create JWT from HTTP request and custom claims map
 - `GetClaimsOfValid` function to validate JWT tokens and extract claims
-- Secret key rotation support via `WithValidationKeys` option
+- Signing key rotation support via `WithValidationKeys` option
 - Fuzz tests for `SetJWTCookie`, `GetClaimsOfValid`, and round-trip testing
 - Comprehensive test coverage for key rotation scenarios
+- Configurable JWT signing algorithm support (HS256, HS384, HS512) via `WithSigningMethod` option
+
+### Changed
+- Renamed all "secret key" terminology to "signing key" for clarity
+- Renamed `WithSecretKey` to `WithSigningKey`
+- Updated internal field names from `secretKey` to `signingKey`

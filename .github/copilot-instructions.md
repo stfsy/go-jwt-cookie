@@ -12,25 +12,28 @@ Key files
 
 Big picture
 - Single package, no server: the library provides `NewCookieManager(opts...)` for creating a cookie manager with configurable options.
-- Internal model: CookieManager holds configuration for cookie attributes (secure, httpOnly, maxAge, sameSite, etc.) and secret keys for signing/validating JWTs.
+- Internal model: CookieManager holds configuration for cookie attributes (secure, httpOnly, maxAge, sameSite, etc.) and signing keys for signing/validating JWTs.
 - JWT tokens include standard claims (iat, exp, nbf) and custom claims provided by the caller.
 - Supports key rotation: one key for signing, multiple keys for validation.
+- Configurable JWT signing algorithm (HS256, HS384, HS512).
 
 Important behaviors & examples (copy/paste-ready)
 - Default cookie settings: httpOnly=true, secure=false, maxAge=3600 (1 hour), sameSite=Lax, path="/"
 - Default cookie name: "jwt_token"
-- Default secret key: "INSECURE-DEFAULT-KEY-PLEASE-CHANGE" (should be overridden in production using `WithSecretKey()`)
+- Default signing key: "INSECURE-DEFAULT-KEY-PLEASE-CHANGE" (should be overridden in production using `WithSigningKey()`)
+- Default signing algorithm: HS256 (can be changed using `WithSigningMethod()`)
 - `SetJWTCookie` creates a JWT with standard claims and custom claims from the provided map, then sets it as an HTTP cookie
 - `GetClaimsOfValid` validates a JWT token from the request cookie and returns the claims map
-- JWT signing algorithm: HS256 (HMAC with SHA-256)
+- JWT signing algorithms: HS256 (default), HS384, HS512
 - Key rotation: use `WithValidationKeys([][]byte{newKey, oldKey})` to accept multiple keys for validation while signing with the primary key
 
 Security notes for agents
-- Always recommend using `WithSecretKey()` to set a strong, unique secret key
-- The default secret key is intentionally weak to encourage explicit configuration
+- Always recommend using `WithSigningKey()` to set a strong, unique signing key
+- The default signing key is intentionally weak to encourage explicit configuration
 - Recommend `WithSecure(true)` for production environments (HTTPS)
 - Recommend `WithHTTPOnly(true)` to prevent XSS attacks
 - Consider `WithSameSite(http.SameSiteStrictMode)` for CSRF protection
+- Recommend appropriate signing algorithm based on security requirements (HS256 is default, HS512 for higher security)
 
 Developer workflows
 - Build: `go build ./...`

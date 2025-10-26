@@ -37,7 +37,7 @@ func main() {
 	manager := jwtcookie.NewCookieManager(
 		jwtcookie.WithSecure(true),
 		jwtcookie.WithHTTPOnly(true),
-		jwtcookie.WithMaxAge(3600),
+		jwtcookie.WithSigningKey([]byte("production-signing-key")),
 	)
 
 	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
@@ -77,14 +77,14 @@ func main() {
 
 ## Key Rotation
 
-The library supports secret key rotation, allowing you to validate tokens signed with old keys while signing new tokens with a new key:
+The library supports signing key rotation, allowing you to validate tokens signed with old keys while signing new tokens with a new key:
 
 ```go
-oldKey := []byte("old-secret-key")
-newKey := []byte("new-secret-key")
+oldKey := []byte("old-signing-key")
+newKey := []byte("new-signing-key")
 
 manager := jwtcookie.NewCookieManager(
-	jwtcookie.WithSecretKey(newKey),  // New key for signing
+	jwtcookie.WithSigningKey(newKey),  // New key for signing
 	jwtcookie.WithValidationKeys([][]byte{newKey, oldKey}),  // Accept both keys for validation
 )
 
@@ -104,8 +104,9 @@ The cookie manager supports the following configuration options:
 - `WithDomain(string)` — sets the cookie domain
 - `WithPath(string)` — sets the cookie path
 - `WithCookieName(string)` — sets a custom cookie name
-- `WithSecretKey([]byte)` — sets the secret key for signing JWTs
-- `WithValidationKeys([][]byte)` — sets multiple secret keys for validation (supports key rotation)
+- `WithSigningKey([]byte)` — sets the signing key for signing JWTs
+- `WithValidationKeys([][]byte)` — sets multiple signing keys for validation (supports key rotation)
+- `WithSigningMethod(jwt.SigningMethod)` — sets the JWT signing algorithm (default: HS256; supported: HS256, HS384, HS512)
 
 ## Testing
 
@@ -134,7 +135,8 @@ Fuzz tests are provided to ensure robustness. Run them with:
 - Always use `WithSecure(true)` in production to ensure cookies are only sent over HTTPS
 - Use `WithHTTPOnly(true)` to prevent XSS attacks from accessing the token
 - Consider using `WithSameSite(http.SameSiteStrictMode)` to prevent CSRF attacks
-- Use a strong secret key for signing JWT tokens
+- Use a strong signing key for signing JWT tokens
+- Use `WithSigningMethod()` to select an appropriate algorithm (HS256, HS384, or HS512)
 
 ## Contributing
 

@@ -20,11 +20,12 @@ func TestNewCookieManager_Defaults(t *testing.T) {
 	assert.Equal(t, http.SameSiteLaxMode, cm.sameSite)
 	assert.Equal(t, "/", cm.path)
 	assert.Equal(t, "jwt_token", cm.cookieName)
-	assert.NotNil(t, cm.secretKey)
+	assert.NotNil(t, cm.signingKey)
+	assert.Equal(t, jwt.SigningMethodHS256, cm.signingMethod)
 }
 
 func TestNewCookieManager_WithOptions(t *testing.T) {
-	secretKey := []byte("test-secret-key")
+	signingKey := []byte("test-signing-key")
 	cm := NewCookieManager(
 		WithSecure(true),
 		WithHTTPOnly(false),
@@ -33,7 +34,7 @@ func TestNewCookieManager_WithOptions(t *testing.T) {
 		WithDomain("example.com"),
 		WithPath("/api"),
 		WithCookieName("custom_token"),
-		WithSecretKey(secretKey),
+		WithSigningKey(signingKey),
 	)
 
 	assert.True(t, cm.secure)
@@ -43,7 +44,7 @@ func TestNewCookieManager_WithOptions(t *testing.T) {
 	assert.Equal(t, "example.com", cm.domain)
 	assert.Equal(t, "/api", cm.path)
 	assert.Equal(t, "custom_token", cm.cookieName)
-	assert.Equal(t, secretKey, cm.secretKey)
+	assert.Equal(t, signingKey, cm.signingKey)
 }
 
 func TestSetJWTCookie_BasicFunctionality(t *testing.T) {
@@ -73,8 +74,8 @@ func TestSetJWTCookie_BasicFunctionality(t *testing.T) {
 }
 
 func TestSetJWTCookie_CustomClaims(t *testing.T) {
-	secretKey := []byte("test-secret-key")
-	cm := NewCookieManager(WithSecretKey(secretKey))
+	signingKey := []byte("test-signing-key")
+	cm := NewCookieManager(WithSigningKey(signingKey))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -92,7 +93,7 @@ func TestSetJWTCookie_CustomClaims(t *testing.T) {
 
 	// Parse and verify the JWT token
 	token, err := jwt.Parse(cookies[0].Value, func(token *jwt.Token) (interface{}, error) {
-		return secretKey, nil
+		return signingKey, nil
 	})
 	require.NoError(t, err)
 	require.True(t, token.Valid)
@@ -112,8 +113,8 @@ func TestSetJWTCookie_CustomClaims(t *testing.T) {
 }
 
 func TestSetJWTCookie_StandardClaims(t *testing.T) {
-	secretKey := []byte("test-secret-key")
-	cm := NewCookieManager(WithSecretKey(secretKey), WithMaxAge(7200))
+	signingKey := []byte("test-signing-key")
+	cm := NewCookieManager(WithSigningKey(signingKey), WithMaxAge(7200))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -127,7 +128,7 @@ func TestSetJWTCookie_StandardClaims(t *testing.T) {
 
 	// Parse the JWT token
 	token, err := jwt.Parse(cookies[0].Value, func(token *jwt.Token) (interface{}, error) {
-		return secretKey, nil
+		return signingKey, nil
 	})
 	require.NoError(t, err)
 
@@ -208,10 +209,10 @@ func TestSetJWTCookie_CustomCookieOptions(t *testing.T) {
 }
 
 func TestSetJWTCookie_TokenSignature(t *testing.T) {
-	secretKey1 := []byte("secret-key-1")
-	secretKey2 := []byte("secret-key-2")
+	signingKey1 := []byte("signing-key-1")
+	signingKey2 := []byte("signing-key-2")
 
-	cm1 := NewCookieManager(WithSecretKey(secretKey1))
+	cm1 := NewCookieManager(WithSigningKey(signingKey1))
 	w1 := httptest.NewRecorder()
 	r1 := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -220,24 +221,24 @@ func TestSetJWTCookie_TokenSignature(t *testing.T) {
 
 	token1 := w1.Result().Cookies()[0].Value
 
-	// Token signed with secretKey1 should be valid with secretKey1
+	// Token signed with signingKey1 should be valid with signingKey1
 	parsedToken1, err := jwt.Parse(token1, func(token *jwt.Token) (interface{}, error) {
-		return secretKey1, nil
+		return signingKey1, nil
 	})
 	require.NoError(t, err)
 	assert.True(t, parsedToken1.Valid)
 
-	// Token signed with secretKey1 should NOT be valid with secretKey2
+	// Token signed with signingKey1 should NOT be valid with signingKey2
 	parsedToken2, err := jwt.Parse(token1, func(token *jwt.Token) (interface{}, error) {
-		return secretKey2, nil
+		return signingKey2, nil
 	})
 	assert.Error(t, err)
 	assert.False(t, parsedToken2.Valid)
 }
 
 func TestGetClaimsOfValid_Success(t *testing.T) {
-	secretKey := []byte("test-secret-key")
-	cm := NewCookieManager(WithSecretKey(secretKey))
+	signingKey := []byte("test-signing-key")
+	cm := NewCookieManager(WithSigningKey(signingKey))
 
 	// First, set a JWT cookie
 	w := httptest.NewRecorder()
@@ -285,7 +286,7 @@ func TestGetClaimsOfValid_NoCookie(t *testing.T) {
 }
 
 func TestGetClaimsOfValid_InvalidToken(t *testing.T) {
-	cm := NewCookieManager(WithSecretKey([]byte("test-key")))
+	cm := NewCookieManager(WithSigningKey([]byte("test-key")))
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
 	// Add a cookie with an invalid token
@@ -300,11 +301,11 @@ func TestGetClaimsOfValid_InvalidToken(t *testing.T) {
 }
 
 func TestGetClaimsOfValid_WrongSecretKey(t *testing.T) {
-	secretKey1 := []byte("secret-key-1")
-	secretKey2 := []byte("secret-key-2")
+	signingKey1 := []byte("signing-key-1")
+	signingKey2 := []byte("signing-key-2")
 
-	// Create token with secretKey1
-	cm1 := NewCookieManager(WithSecretKey(secretKey1))
+	// Create token with signingKey1
+	cm1 := NewCookieManager(WithSigningKey(signingKey1))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -314,8 +315,8 @@ func TestGetClaimsOfValid_WrongSecretKey(t *testing.T) {
 	cookies := w.Result().Cookies()
 	require.Len(t, cookies, 1)
 
-	// Try to validate with secretKey2
-	cm2 := NewCookieManager(WithSecretKey(secretKey2))
+	// Try to validate with signingKey2
+	cm2 := NewCookieManager(WithSigningKey(signingKey2))
 	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
 	r2.AddCookie(cookies[0])
 
@@ -325,11 +326,11 @@ func TestGetClaimsOfValid_WrongSecretKey(t *testing.T) {
 }
 
 func TestGetClaimsOfValid_KeyRotation(t *testing.T) {
-	oldKey := []byte("old-secret-key")
-	newKey := []byte("new-secret-key")
+	oldKey := []byte("old-signing-key")
+	newKey := []byte("new-signing-key")
 
 	// Create token with old key
-	cm1 := NewCookieManager(WithSecretKey(oldKey))
+	cm1 := NewCookieManager(WithSigningKey(oldKey))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -346,7 +347,7 @@ func TestGetClaimsOfValid_KeyRotation(t *testing.T) {
 
 	// Validate with both old and new keys (key rotation scenario)
 	cm2 := NewCookieManager(
-		WithSecretKey(newKey),                 // New key for signing
+		WithSigningKey(newKey),                 // New key for signing
 		WithValidationKeys([][]byte{newKey, oldKey}), // Accept both keys for validation
 	)
 
@@ -368,7 +369,7 @@ func TestGetClaimsOfValid_MultipleValidationKeys(t *testing.T) {
 	key3 := []byte("key-3")
 
 	// Create token with key2
-	cm1 := NewCookieManager(WithSecretKey(key2))
+	cm1 := NewCookieManager(WithSigningKey(key2))
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -384,7 +385,7 @@ func TestGetClaimsOfValid_MultipleValidationKeys(t *testing.T) {
 
 	// Validate with multiple keys including key2
 	cm2 := NewCookieManager(
-		WithSecretKey(key3),
+		WithSigningKey(key3),
 		WithValidationKeys([][]byte{key1, key2, key3}),
 	)
 
@@ -400,9 +401,9 @@ func TestGetClaimsOfValid_MultipleValidationKeys(t *testing.T) {
 }
 
 func TestGetClaimsOfValid_UsesSigningKeyWhenNoValidationKeys(t *testing.T) {
-	secretKey := []byte("test-secret-key")
-	cm := NewCookieManager(WithSecretKey(secretKey))
-	// Note: No WithValidationKeys set, should fall back to using secretKey
+	signingKey := []byte("test-signing-key")
+	cm := NewCookieManager(WithSigningKey(signingKey))
+	// Note: No WithValidationKeys set, should fall back to using signingKey
 
 	// Create and set token
 	w := httptest.NewRecorder()
@@ -427,4 +428,56 @@ func TestGetClaimsOfValid_UsesSigningKeyWhenNoValidationKeys(t *testing.T) {
 	require.NotNil(t, claims)
 
 	assert.Equal(t, "11111", claims["user_id"])
+}
+
+func TestSetJWTCookie_ConfigurableSigningMethod(t *testing.T) {
+	signingKey := []byte("test-signing-key")
+	
+	// Test with HS256 (default)
+	cm256 := NewCookieManager(WithSigningKey(signingKey))
+	w256 := httptest.NewRecorder()
+	r256 := httptest.NewRequest(http.MethodGet, "/", nil)
+	
+	err := cm256.SetJWTCookie(w256, r256, map[string]string{"alg": "hs256"})
+	require.NoError(t, err)
+	
+	token256, err := jwt.Parse(w256.Result().Cookies()[0].Value, func(token *jwt.Token) (interface{}, error) {
+		return signingKey, nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "HS256", token256.Header["alg"])
+	
+	// Test with HS384
+	cm384 := NewCookieManager(
+		WithSigningKey(signingKey),
+		WithSigningMethod(jwt.SigningMethodHS384),
+	)
+	w384 := httptest.NewRecorder()
+	r384 := httptest.NewRequest(http.MethodGet, "/", nil)
+	
+	err = cm384.SetJWTCookie(w384, r384, map[string]string{"alg": "hs384"})
+	require.NoError(t, err)
+	
+	token384, err := jwt.Parse(w384.Result().Cookies()[0].Value, func(token *jwt.Token) (interface{}, error) {
+		return signingKey, nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "HS384", token384.Header["alg"])
+	
+	// Test with HS512
+	cm512 := NewCookieManager(
+		WithSigningKey(signingKey),
+		WithSigningMethod(jwt.SigningMethodHS512),
+	)
+	w512 := httptest.NewRecorder()
+	r512 := httptest.NewRequest(http.MethodGet, "/", nil)
+	
+	err = cm512.SetJWTCookie(w512, r512, map[string]string{"alg": "hs512"})
+	require.NoError(t, err)
+	
+	token512, err := jwt.Parse(w512.Result().Cookies()[0].Value, func(token *jwt.Token) (interface{}, error) {
+		return signingKey, nil
+	})
+	require.NoError(t, err)
+	assert.Equal(t, "HS512", token512.Header["alg"])
 }

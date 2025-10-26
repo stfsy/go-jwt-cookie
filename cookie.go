@@ -17,8 +17,9 @@ type CookieManager struct {
 	domain         string
 	path           string
 	cookieName     string
-	secretKey      []byte   // Used for signing
-	validationKeys [][]byte // Used for validation (supports key rotation)
+	signingKey     []byte              // Used for signing
+	validationKeys [][]byte            // Used for validation (supports key rotation)
+	signingMethod  jwt.SigningMethod   // JWT signing algorithm
 }
 
 // Option is a function that configures a CookieManager
@@ -73,14 +74,14 @@ func WithCookieName(name string) Option {
 	}
 }
 
-// WithSecretKey sets the secret key for signing JWTs
-func WithSecretKey(key []byte) Option {
+// WithSigningKey sets the signing key for signing JWTs
+func WithSigningKey(key []byte) Option {
 	return func(cm *CookieManager) {
-		cm.secretKey = key
+		cm.signingKey = key
 	}
 }
 
-// WithValidationKeys sets the secret keys for validating JWTs (supports key rotation)
+// WithValidationKeys sets the signing keys for validating JWTs (supports key rotation)
 // If not set, the signing key will be used for validation
 func WithValidationKeys(keys [][]byte) Option {
 	return func(cm *CookieManager) {
@@ -88,17 +89,26 @@ func WithValidationKeys(keys [][]byte) Option {
 	}
 }
 
+// WithSigningMethod sets the JWT signing algorithm (default: HS256)
+// Supported methods: HS256, HS384, HS512
+func WithSigningMethod(method jwt.SigningMethod) Option {
+	return func(cm *CookieManager) {
+		cm.signingMethod = method
+	}
+}
+
 // NewCookieManager creates a new CookieManager with the given options
 func NewCookieManager(opts ...Option) *CookieManager {
 	// Set defaults
 	cm := &CookieManager{
-		secure:     false,
-		httpOnly:   true,
-		maxAge:     3600, // 1 hour default
-		sameSite:   http.SameSiteLaxMode,
-		path:       "/",
-		cookieName: "jwt_token",
-		secretKey:  []byte("INSECURE-DEFAULT-KEY-PLEASE-CHANGE"), // Should be overridden in production
+		secure:        false,
+		httpOnly:      true,
+		maxAge:        3600, // 1 hour default
+		sameSite:      http.SameSiteLaxMode,
+		path:          "/",
+		cookieName:    "jwt_token",
+		signingKey:    []byte("INSECURE-DEFAULT-KEY-PLEASE-CHANGE"), // Should be overridden in production
+		signingMethod: jwt.SigningMethodHS256,                       // Default to HS256
 	}
 
 	// Apply options
@@ -125,10 +135,10 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 	}
 
 	// Create the JWT token
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	token := jwt.NewWithClaims(cm.signingMethod, claims)
 
-	// Sign the token with the secret key
-	tokenString, err := token.SignedString(cm.secretKey)
+	// Sign the token with the signing key
+	tokenString, err := token.SignedString(cm.signingKey)
 	if err != nil {
 		return fmt.Errorf("failed to sign JWT token: %w", err)
 	}
@@ -163,7 +173,7 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 	validationKeys := cm.validationKeys
 	if len(validationKeys) == 0 {
 		// If no validation keys are set, use the signing key
-		validationKeys = [][]byte{cm.secretKey}
+		validationKeys = [][]byte{cm.signingKey}
 	}
 
 	// Try to validate with each key (supports key rotation)
