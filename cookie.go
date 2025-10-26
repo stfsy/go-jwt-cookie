@@ -3,8 +3,13 @@ package jwtcookie
 import (
 	"crypto/ecdsa"
 	"crypto/rsa"
+	"crypto/sha256"
+	"crypto/x509"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -24,11 +29,15 @@ type CookieManager struct {
 	subject    string
 	signingKey interface{} // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
 	// Typed validation keys for key rotation (avoid boxing/rt type assertions)
-	validationKeysHMAC  [][]byte
-	validationKeysRSA   []*rsa.PublicKey
-	validationKeysECDSA []*ecdsa.PublicKey
-	signingMethod       jwt.SigningMethod // JWT signing algorithm
-	parser              *jwt.Parser       // cached parser with configured validation options
+	validationKeysHMAC   [][]byte
+	validationKeysRSA    []*rsa.PublicKey
+	validationKeysECDSA  []*ecdsa.PublicKey
+	signingMethod        jwt.SigningMethod // JWT signing algorithm
+	parser               *jwt.Parser       // cached parser with configured validation options
+	signingKeyKID        string
+	validationHMACByKID  map[string][]byte
+	validationRSAByKID   map[string]*rsa.PublicKey
+	validationECDSAByKID map[string]*ecdsa.PublicKey
 }
 
 // Option is a function that configures a CookieManager
@@ -114,6 +123,7 @@ func WithSubject(subject string) Option {
 func WithSigningKeyHMAC(key []byte) Option {
 	return func(cm *CookieManager) {
 		cm.signingKey = key
+		cm.signingKeyKID = computeKIDFromHMAC(key)
 	}
 }
 
@@ -306,6 +316,47 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		jwt.WithSubject(cm.subject),
 	)
 
+	// Prepare KID maps for fast lookup
+	switch cm.signingMethod {
+	case jwt.SigningMethodHS256, jwt.SigningMethodHS384, jwt.SigningMethodHS512:
+		// Compute KID for signing key and validation keys
+		cm.validationHMACByKID = make(map[string][]byte, len(cm.validationKeysHMAC))
+		for _, k := range cm.validationKeysHMAC {
+			cm.validationHMACByKID[computeKIDFromHMAC(k)] = k
+		}
+		if sk, ok := cm.signingKey.([]byte); ok && len(sk) > 0 {
+			cm.signingKeyKID = computeKIDFromHMAC(sk)
+		}
+	case jwt.SigningMethodRS256, jwt.SigningMethodRS384, jwt.SigningMethodRS512, jwt.SigningMethodPS256, jwt.SigningMethodPS384, jwt.SigningMethodPS512:
+		cm.validationRSAByKID = make(map[string]*rsa.PublicKey, len(cm.validationKeysRSA))
+		for _, pk := range cm.validationKeysRSA {
+			kid, err := computeKIDFromPublicKey(pk)
+			if err != nil {
+				return nil, fmt.Errorf("failed to compute KID from RSA public key: %w", err)
+			}
+			cm.validationRSAByKID[kid] = pk
+		}
+		if pk, ok := cm.signingKey.(*rsa.PrivateKey); ok {
+			kid, err := computeKIDFromPublicKey(&pk.PublicKey)
+			if err == nil {
+				cm.signingKeyKID = kid
+			}
+			cm.signingKeyKID = kid
+		}
+	case jwt.SigningMethodES256, jwt.SigningMethodES384, jwt.SigningMethodES512:
+		cm.validationECDSAByKID = make(map[string]*ecdsa.PublicKey, len(cm.validationKeysECDSA))
+		for _, pk := range cm.validationKeysECDSA {
+			if kid, err := computeKIDFromPublicKey(pk); err == nil {
+				cm.validationECDSAByKID[kid] = pk
+			}
+		}
+		if pk, ok := cm.signingKey.(*ecdsa.PrivateKey); ok {
+			if kid, err := computeKIDFromPublicKey(&pk.PublicKey); err == nil {
+				cm.signingKeyKID = kid
+			}
+		}
+	}
+
 	return cm, nil
 }
 
@@ -331,6 +382,10 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 
 	// Create the JWT token
 	token := jwt.NewWithClaims(cm.signingMethod, claims)
+	// Set KID header to allow fast key selection during validation
+	if cm.signingKeyKID != "" {
+		token.Header["kid"] = cm.signingKeyKID
+	}
 
 	// Sign the token with the signing key
 	tokenString, err := token.SignedString(cm.signingKey)
@@ -364,44 +419,70 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 
 	tokenString := cookie.Value
 
-	// Try to validate with each key (supports key rotation)
+	// Try to validate with each key (supports key rotation). If KID is present, try that key first.
 	var lastErr error
+	kid, _ := parseKID(tokenString)
+
 	switch cm.signingMethod {
 	case jwt.SigningMethodHS256, jwt.SigningMethodHS384, jwt.SigningMethodHS512:
-		for _, key := range cm.validationKeysHMAC {
-			token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil })
-			if err == nil && token.Valid {
-				claims, ok := token.Claims.(jwt.MapClaims)
-				if !ok {
-					return nil, fmt.Errorf("failed to parse claims")
+		if kid != "" {
+			if publicKey, ok := cm.validationHMACByKID[kid]; ok {
+				if publicKey != nil {
+					if claims, err := validateWithKey(cm, tokenString, publicKey); err == nil {
+						return claims, nil
+					} else {
+						lastErr = err
+					}
 				}
-				return map[string]interface{}(claims), nil
 			}
-			lastErr = err
+		}
+		// Fall back to iterating remaining keys
+		for _, key := range cm.validationKeysHMAC {
+			if claims, err := validateWithKey(cm, tokenString, key); err == nil {
+				return claims, nil
+			} else {
+				lastErr = err
+			}
 		}
 	case jwt.SigningMethodRS256, jwt.SigningMethodRS384, jwt.SigningMethodRS512, jwt.SigningMethodPS256, jwt.SigningMethodPS384, jwt.SigningMethodPS512:
-		for _, key := range cm.validationKeysRSA {
-			token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil })
-			if err == nil && token.Valid {
-				claims, ok := token.Claims.(jwt.MapClaims)
-				if !ok {
-					return nil, fmt.Errorf("failed to parse claims")
+		if kid != "" {
+			publicKey := cm.validationRSAByKID[kid]
+			if publicKey != nil {
+				if claims, err := validateWithKey(cm, tokenString, publicKey); err == nil {
+					return claims, nil
+				} else {
+					lastErr = err
 				}
-				return map[string]interface{}(claims), nil
 			}
-			lastErr = err
+		}
+
+		// Fall back to iterating remaining keys
+		for _, key := range cm.validationKeysRSA {
+			if claims, err := validateWithKey(cm, tokenString, key); err == nil {
+				return claims, nil
+			} else {
+				lastErr = err
+			}
 		}
 	case jwt.SigningMethodES256, jwt.SigningMethodES384, jwt.SigningMethodES512:
-		for _, key := range cm.validationKeysECDSA {
-			token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil })
-			if err == nil && token.Valid {
-				claims, ok := token.Claims.(jwt.MapClaims)
-				if !ok {
-					return nil, fmt.Errorf("failed to parse claims")
+		if kid != "" {
+			publicKey := cm.validationECDSAByKID[kid]
+			if publicKey != nil {
+				if claims, err := validateWithKey(cm, tokenString, publicKey); err == nil {
+					return claims, nil
+				} else {
+					lastErr = err
 				}
-				return map[string]interface{}(claims), nil
 			}
-			lastErr = err
+		}
+
+		// Fall back to iterating remaining keys
+		for _, key := range cm.validationKeysECDSA {
+			if claims, err := validateWithKey(cm, tokenString, key); err == nil {
+				return claims, nil
+			} else {
+				lastErr = err
+			}
 		}
 	default:
 		return nil, fmt.Errorf("unexpected signing method: %v", cm.signingMethod.Alg())
@@ -412,4 +493,58 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 		return nil, fmt.Errorf("failed to validate token: %w", lastErr)
 	}
 	return nil, fmt.Errorf("token is invalid")
+}
+
+// Shared helper to validate with a single key and return claims
+func validateWithKey(cm *CookieManager, tokenString string, key interface{}) (map[string]interface{}, error) {
+	token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil })
+	if err == nil && token.Valid {
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			return nil, fmt.Errorf("failed to parse claims")
+		}
+		return map[string]interface{}(claims), nil
+	}
+	return nil, err
+}
+
+// computeKIDFromHMAC returns a stable, short KID for an HMAC key by hashing the raw key with SHA-256
+// and encoding only the first 8 bytes (64 bits) using base64url (no padding).
+func computeKIDFromHMAC(key []byte) string {
+	sum := sha256.Sum256(key)
+	return base64.RawURLEncoding.EncodeToString(sum[:8])
+}
+
+// computeKIDFromPublicKey returns a short KID for a public key by hashing the DER-encoded
+// SubjectPublicKeyInfo with SHA-256 and encoding only the first 8 bytes using base64url (no padding).
+func computeKIDFromPublicKey(pk any) (string, error) {
+	der, err := x509.MarshalPKIXPublicKey(pk)
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(der)
+	return base64.RawURLEncoding.EncodeToString(sum[:8]), nil
+}
+
+// parseKID extracts the kid field from the JWT header without verifying the token.
+func parseKID(token string) (string, error) {
+	parts := strings.Split(token, ".")
+	if len(parts) < 2 {
+		return "", fmt.Errorf("malformed token")
+	}
+	headerB64 := parts[0]
+	headerJSON, err := base64.RawURLEncoding.DecodeString(headerB64)
+	if err != nil {
+		return "", err
+	}
+	var header map[string]interface{}
+	if err := json.Unmarshal(headerJSON, &header); err != nil {
+		return "", err
+	}
+	if v, ok := header["kid"]; ok {
+		if s, ok := v.(string); ok {
+			return s, nil
+		}
+	}
+	return "", nil
 }
