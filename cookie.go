@@ -366,11 +366,7 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 				if !ok {
 					return nil, fmt.Errorf("failed to parse claims")
 				}
-				result := make(map[string]interface{}, len(claims))
-				for k, v := range claims {
-					result[k] = v
-				}
-				return result, nil
+				return map[string]interface{}(claims), nil
 			}
 			lastErr = err
 		}
@@ -382,11 +378,7 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 				if !ok {
 					return nil, fmt.Errorf("failed to parse claims")
 				}
-				result := make(map[string]interface{}, len(claims))
-				for k, v := range claims {
-					result[k] = v
-				}
-				return result, nil
+				return map[string]interface{}(claims), nil
 			}
 			lastErr = err
 		}
@@ -398,11 +390,7 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 				if !ok {
 					return nil, fmt.Errorf("failed to parse claims")
 				}
-				result := make(map[string]interface{}, len(claims))
-				for k, v := range claims {
-					result[k] = v
-				}
-				return result, nil
+				return map[string]interface{}(claims), nil
 			}
 			lastErr = err
 		}
