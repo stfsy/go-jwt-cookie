@@ -1,0 +1,43 @@
+# Terraform Provider testing workflow.
+name: tests
+
+on:
+  push:
+
+# Testing only needs permissions to read the repository contents.
+permissions:
+  contents: read
+
+concurrency:
+  group: tests
+  cancel-in-progress: true
+
+jobs:
+  # Ensure project builds before running testing matrix
+  unit-tests:
+    name: unit-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - run: sudo apt-get install -y libseccomp-dev pkg-config
+      - run: go mod download
+      - run: ./test.sh
+
+  fuzz-tests:
+    name: fuzz-tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: 'go.mod'
+          cache: true
+      - run: sudo apt-get install -y libseccomp-dev pkg-config
+      - run: go mod download
+      - run: ./fuzz.sh
