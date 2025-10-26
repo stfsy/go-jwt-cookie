@@ -19,9 +19,9 @@ type CookieManager struct {
 	domain         string
 	path           string
 	cookieName     string
-	signingKey     interface{}   // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
-	validationKeys []interface{} // Used for validation (supports key rotation)
-	signingMethod  jwt.SigningMethod   // JWT signing algorithm
+	signingKey     interface{}       // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
+	validationKeys []interface{}     // Used for validation (supports key rotation)
+	signingMethod  jwt.SigningMethod // JWT signing algorithm
 }
 
 // Option is a function that configures a CookieManager
@@ -155,21 +155,45 @@ func WithSigningMethod(method jwt.SigningMethod) Option {
 }
 
 // Typesafe helpers for signing methods
-func WithSigningMethodHS256() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS256 } }
-func WithSigningMethodHS384() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS384 } }
-func WithSigningMethodHS512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS512 } }
+func WithSigningMethodHS256() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS256 }
+}
+func WithSigningMethodHS384() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS384 }
+}
+func WithSigningMethodHS512() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodHS512 }
+}
 
-func WithSigningMethodRS256() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS256 } }
-func WithSigningMethodRS384() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS384 } }
-func WithSigningMethodRS512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS512 } }
+func WithSigningMethodRS256() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS256 }
+}
+func WithSigningMethodRS384() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS384 }
+}
+func WithSigningMethodRS512() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodRS512 }
+}
 
-func WithSigningMethodPS256() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS256 } }
-func WithSigningMethodPS384() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS384 } }
-func WithSigningMethodPS512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS512 } }
+func WithSigningMethodPS256() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS256 }
+}
+func WithSigningMethodPS384() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS384 }
+}
+func WithSigningMethodPS512() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodPS512 }
+}
 
-func WithSigningMethodES256() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES256 } }
-func WithSigningMethodES384() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES384 } }
-func WithSigningMethodES512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES512 } }
+func WithSigningMethodES256() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES256 }
+}
+func WithSigningMethodES384() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES384 }
+}
+func WithSigningMethodES512() Option {
+	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES512 }
+}
 
 // NewCookieManager creates a new CookieManager with the given options
 func NewCookieManager(opts ...Option) (*CookieManager, error) {
@@ -242,9 +266,9 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 	// Create JWT claims with standard fields
 	now := time.Now()
 	claims := jwt.MapClaims{
-		"iat": now.Unix(),                        // Issued at
+		"iat": now.Unix(),                                             // Issued at
 		"exp": now.Add(time.Duration(cm.maxAge) * time.Second).Unix(), // Expiration time
-		"nbf": now.Unix(),                        // Not before
+		"nbf": now.Unix(),                                             // Not before
 	}
 
 	// Add custom claims from the map
