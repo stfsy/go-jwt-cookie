@@ -20,7 +20,10 @@ func FuzzSetJWTCookie(f *testing.F) {
 			return
 		}
 
-	cm := NewCookieManager(WithSigningKeyHMAC(signingKey))
+		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}))
+		if err != nil {
+			t.Skip("failed to create cookie manager")
+		}
 		w := httptest.NewRecorder()
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -34,7 +37,7 @@ func FuzzSetJWTCookie(f *testing.F) {
 		}
 
 		// Test SetJWTCookie - should not panic
-		err := cm.SetJWTCookie(w, r, claims)
+		err = cm.SetJWTCookie(w, r, claims)
 
 		// We expect no error in normal operation
 		if err != nil {
@@ -68,10 +71,15 @@ func FuzzGetClaimsOfValid(f *testing.F) {
 			cookieName = "jwt_token"
 		}
 
-		cm := NewCookieManager(
+		cm, err := NewCookieManager(
 			WithSigningKeyHMAC(signingKey),
+			WithSigningMethodHS256(),
+			WithValidationKeysHMAC([][]byte{signingKey}),
 			WithCookieName(cookieName),
 		)
+		if err != nil {
+			t.Skip("failed to create cookie manager")
+		}
 
 		r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -107,7 +115,11 @@ func FuzzRoundTrip(f *testing.F) {
 			return
 		}
 
-	cm := NewCookieManager(WithSigningKeyHMAC(signingKey))
+		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}))
+		if err != nil {
+			t.Errorf("Failed to create cookie manager: %v", err)
+			return
+		}
 
 		// Set cookie
 		w := httptest.NewRecorder()
@@ -118,7 +130,7 @@ func FuzzRoundTrip(f *testing.F) {
 			claims[claimKey] = claimValue
 		}
 
-		err := cm.SetJWTCookie(w, r1, claims)
+		err = cm.SetJWTCookie(w, r1, claims)
 		if err != nil {
 			t.Skip("Error setting cookie")
 		}

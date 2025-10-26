@@ -172,17 +172,15 @@ func WithSigningMethodES384() Option { return func(cm *CookieManager) { cm.signi
 func WithSigningMethodES512() Option { return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES512 } }
 
 // NewCookieManager creates a new CookieManager with the given options
-func NewCookieManager(opts ...Option) *CookieManager {
+func NewCookieManager(opts ...Option) (*CookieManager, error) {
 	// Set defaults
 	cm := &CookieManager{
-		secure:        false,
-		httpOnly:      true,
-		maxAge:        3600, // 1 hour default
-		sameSite:      http.SameSiteLaxMode,
-		path:          "/",
-		cookieName:    "jwt_token",
-		signingKey:    []byte("INSECURE-DEFAULT-KEY-PLEASE-CHANGE"), // Should be overridden in production
-		signingMethod: jwt.SigningMethodHS256,                       // Default to HS256
+		secure:     true,
+		httpOnly:   true,
+		maxAge:     3600, // 1 hour default
+		sameSite:   http.SameSiteStrictMode,
+		path:       "/",
+		cookieName: "jwt_token",
 	}
 
 	// Apply options
@@ -190,7 +188,53 @@ func NewCookieManager(opts ...Option) *CookieManager {
 		opt(cm)
 	}
 
-	return cm
+	if cm.signingMethod == nil {
+		return nil, fmt.Errorf("signing method must be specified")
+	} else if cm.signingKey == nil {
+		return nil, fmt.Errorf("signing key must be specified")
+	} else if len(cm.validationKeys) == 0 {
+		return nil, fmt.Errorf("at least one validation key must be specified")
+	} else if cm.signingMethod == jwt.SigningMethodHS256 ||
+		cm.signingMethod == jwt.SigningMethodHS384 ||
+		cm.signingMethod == jwt.SigningMethodHS512 {
+		if _, ok := cm.signingKey.([]byte); !ok {
+			return nil, fmt.Errorf("HMAC signing method requires []byte signing key")
+		}
+		for _, key := range cm.validationKeys {
+			if _, ok := key.([]byte); !ok {
+				return nil, fmt.Errorf("HMAC validation keys must be of type []byte")
+			}
+		}
+	} else if cm.signingMethod == jwt.SigningMethodRS256 ||
+		cm.signingMethod == jwt.SigningMethodRS384 ||
+		cm.signingMethod == jwt.SigningMethodRS512 ||
+		cm.signingMethod == jwt.SigningMethodPS256 ||
+		cm.signingMethod == jwt.SigningMethodPS384 ||
+		cm.signingMethod == jwt.SigningMethodPS512 {
+		if _, ok := cm.signingKey.(*rsa.PrivateKey); !ok {
+			return nil, fmt.Errorf("RSA signing method requires *rsa.PrivateKey signing key")
+		}
+		// check validation keys are of type public key
+		for _, key := range cm.validationKeys {
+			if _, ok := key.(*rsa.PublicKey); !ok {
+				return nil, fmt.Errorf("RSA validation keys must be of type *rsa.PublicKey")
+			}
+		}
+	} else if cm.signingMethod == jwt.SigningMethodES256 ||
+		cm.signingMethod == jwt.SigningMethodES384 ||
+		cm.signingMethod == jwt.SigningMethodES512 {
+		if _, ok := cm.signingKey.(*ecdsa.PrivateKey); !ok {
+			return nil, fmt.Errorf("ECDSA signing method requires *ecdsa.PrivateKey signing key")
+		}
+		// check validation keys are of type public key
+		for _, key := range cm.validationKeys {
+			if _, ok := key.(*ecdsa.PublicKey); !ok {
+				return nil, fmt.Errorf("ECDSA validation keys must be of type *ecdsa.PublicKey")
+			}
+		}
+	}
+
+	return cm, nil
 }
 
 // SetJWTCookie creates a JWT token with the provided claims and sets it as an HTTP cookie
