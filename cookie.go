@@ -89,7 +89,7 @@ func NewCookieManager(opts ...Option) *CookieManager {
 		sameSite:   http.SameSiteLaxMode,
 		path:       "/",
 		cookieName: "jwt_token",
-		secretKey:  []byte("default-secret-key"), // Should be overridden in production
+		secretKey:  []byte("INSECURE-DEFAULT-KEY-PLEASE-CHANGE"), // Should be overridden in production
 	}
 
 	// Apply options
