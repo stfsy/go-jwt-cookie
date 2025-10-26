@@ -9,18 +9,18 @@ import (
 // FuzzSetJWTCookie fuzzes the SetJWTCookie function with random inputs
 func FuzzSetJWTCookie(f *testing.F) {
 	// Seed corpus with some basic examples
-	f.Add([]byte("signing-key"), "user_id", "12345", "role", "admin")
-	f.Add([]byte("another-key"), "email", "test@example.com", "name", "Test User")
-	f.Add([]byte("short"), "a", "b", "c", "d")
+	f.Add([]byte("0123456789abcdef0123456789abcdef"), "user_id", "12345", "role", "admin")
+	f.Add([]byte("0123456789abcdef0123456789abcdee"), "email", "test@example.com", "name", "Test User")
+	f.Add([]byte("0123456789abcdef0123456789abcdff"), "a", "b", "c", "d")
 	f.Add([]byte(""), "key", "value", "", "")
 
 	f.Fuzz(func(t *testing.T, signingKey []byte, key1, val1, key2, val2 string) {
-		// Skip if signing key is empty as it would cause issues
-		if len(signingKey) == 0 {
+		// Skip if signing key is empty or too short for HS256 (min 32)
+		if len(signingKey) < 32 {
 			return
 		}
 
-		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}))
+		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 		if err != nil {
 			t.Skip("failed to create cookie manager")
 		}
@@ -55,14 +55,14 @@ func FuzzSetJWTCookie(f *testing.F) {
 // FuzzGetClaimsOfValid fuzzes the GetClaimsOfValid function with random inputs
 func FuzzGetClaimsOfValid(f *testing.F) {
 	// Seed corpus with some basic examples
-	f.Add([]byte("signing-key"), "jwt_token", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")
-	f.Add([]byte("another-key"), "custom_token", "invalid.token.value")
-	f.Add([]byte("test"), "jwt_token", "")
+	f.Add([]byte("0123456789abcdef0123456789abcdef"), "jwt_token", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c")
+	f.Add([]byte("0123456789abcdef0123456789abcdee"), "custom_token", "invalid.token.value")
+	f.Add([]byte("0123456789abcdef0123456789abcdff"), "jwt_token", "")
 	f.Add([]byte(""), "jwt_token", "some-value")
 
 	f.Fuzz(func(t *testing.T, signingKey []byte, cookieName, tokenValue string) {
-		// Skip if signing key is empty
-		if len(signingKey) == 0 {
+		// Skip if signing key is empty or too short for HS256 (min 32)
+		if len(signingKey) < 32 {
 			return
 		}
 
@@ -76,6 +76,7 @@ func FuzzGetClaimsOfValid(f *testing.F) {
 			WithSigningMethodHS256(),
 			WithValidationKeysHMAC([][]byte{signingKey}),
 			WithCookieName(cookieName),
+			WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
 		)
 		if err != nil {
 			t.Skip("failed to create cookie manager")
@@ -105,17 +106,17 @@ func FuzzGetClaimsOfValid(f *testing.F) {
 // FuzzRoundTrip fuzzes a round trip of setting and getting JWT cookies
 func FuzzRoundTrip(f *testing.F) {
 	// Seed corpus
-	f.Add([]byte("signing-key"), "user_id", "12345")
-	f.Add([]byte("another-secret"), "email", "test@example.com")
-	f.Add([]byte("x"), "a", "b")
+	f.Add([]byte("0123456789abcdef0123456789abcdef"), "user_id", "12345")
+	f.Add([]byte("0123456789abcdef0123456789abcdee"), "email", "test@example.com")
+	f.Add([]byte("0123456789abcdef0123456789abcdff"), "a", "b")
 
 	f.Fuzz(func(t *testing.T, signingKey []byte, claimKey, claimValue string) {
-		// Skip if signing key is empty
-		if len(signingKey) == 0 {
+		// Skip if signing key is empty or too short for HS256 (min 32)
+		if len(signingKey) < 32 {
 			return
 		}
 
-		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}))
+		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 		if err != nil {
 			t.Errorf("Failed to create cookie manager: %v", err)
 			return
