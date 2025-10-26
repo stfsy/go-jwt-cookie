@@ -28,6 +28,7 @@ type CookieManager struct {
 	validationKeysRSA   []*rsa.PublicKey
 	validationKeysECDSA []*ecdsa.PublicKey
 	signingMethod       jwt.SigningMethod // JWT signing algorithm
+	parser              *jwt.Parser       // cached parser with configured validation options
 }
 
 // Option is a function that configures a CookieManager
@@ -297,6 +298,14 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		// validation keys are typed; no runtime checks needed here
 	}
 
+	// Build and cache a JWT parser configured with fixed validation options
+	cm.parser = jwt.NewParser(
+		jwt.WithValidMethods([]string{cm.signingMethod.Alg()}),
+		jwt.WithIssuer(cm.issuer),
+		jwt.WithAudience(cm.audience),
+		jwt.WithSubject(cm.subject),
+	)
+
 	return cm, nil
 }
 
@@ -360,7 +369,7 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 	switch cm.signingMethod {
 	case jwt.SigningMethodHS256, jwt.SigningMethodHS384, jwt.SigningMethodHS512:
 		for _, key := range cm.validationKeysHMAC {
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil }, jwt.WithValidMethods([]string{cm.signingMethod.Alg()}), jwt.WithIssuer(cm.issuer), jwt.WithAudience(cm.audience), jwt.WithSubject(cm.subject))
+			token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil })
 			if err == nil && token.Valid {
 				claims, ok := token.Claims.(jwt.MapClaims)
 				if !ok {
@@ -372,7 +381,7 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 		}
 	case jwt.SigningMethodRS256, jwt.SigningMethodRS384, jwt.SigningMethodRS512, jwt.SigningMethodPS256, jwt.SigningMethodPS384, jwt.SigningMethodPS512:
 		for _, key := range cm.validationKeysRSA {
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil }, jwt.WithValidMethods([]string{cm.signingMethod.Alg()}), jwt.WithIssuer(cm.issuer), jwt.WithAudience(cm.audience), jwt.WithSubject(cm.subject))
+			token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil })
 			if err == nil && token.Valid {
 				claims, ok := token.Claims.(jwt.MapClaims)
 				if !ok {
@@ -384,7 +393,7 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 		}
 	case jwt.SigningMethodES256, jwt.SigningMethodES384, jwt.SigningMethodES512:
 		for _, key := range cm.validationKeysECDSA {
-			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil }, jwt.WithValidMethods([]string{cm.signingMethod.Alg()}), jwt.WithIssuer(cm.issuer), jwt.WithAudience(cm.audience), jwt.WithSubject(cm.subject))
+			token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil })
 			if err == nil && token.Valid {
 				claims, ok := token.Claims.(jwt.MapClaims)
 				if !ok {
