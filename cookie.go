@@ -2,6 +2,7 @@ package jwtcookie
 
 import (
 	"crypto/ecdsa"
+	"crypto/hmac"
 	"crypto/rsa"
 	"crypto/sha256"
 	"crypto/x509"
@@ -35,6 +36,7 @@ type CookieManager struct {
 	signingMethod        jwt.SigningMethod // JWT signing algorithm
 	parser               *jwt.Parser       // cached parser with configured validation options
 	signingKeyKID        string
+	kidSalt              []byte // optional salt for deriving HMAC KIDs deterministically without exposing raw key material
 	validationHMACByKID  map[string][]byte
 	validationRSAByKID   map[string]*rsa.PublicKey
 	validationECDSAByKID map[string]*ecdsa.PublicKey
@@ -140,10 +142,12 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		// Compute KID for signing key and validation keys
 		cm.validationHMACByKID = make(map[string][]byte, len(cm.validationKeysHMAC))
 		for _, k := range cm.validationKeysHMAC {
-			cm.validationHMACByKID[computeKIDFromHMAC(k)] = k
+			var kid string
+			kid = computeKIDFromSaltedHMAC(cm.kidSalt, k)
+			cm.validationHMACByKID[kid] = k
 		}
 		if sk, ok := cm.signingKey.([]byte); ok && len(sk) > 0 {
-			cm.signingKeyKID = computeKIDFromHMAC(sk)
+			cm.signingKeyKID = computeKIDFromSaltedHMAC(cm.kidSalt, sk)
 		}
 	case jwt.SigningMethodRS256, jwt.SigningMethodRS384, jwt.SigningMethodRS512, jwt.SigningMethodPS256, jwt.SigningMethodPS384, jwt.SigningMethodPS512:
 		cm.validationRSAByKID = make(map[string]*rsa.PublicKey, len(cm.validationKeysRSA))
@@ -155,11 +159,9 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 			cm.validationRSAByKID[kid] = pk
 		}
 		if pk, ok := cm.signingKey.(*rsa.PrivateKey); ok {
-			kid, err := computeKIDFromPublicKey(&pk.PublicKey)
-			if err == nil {
+			if kid, err := computeKIDFromPublicKey(&pk.PublicKey); err == nil {
 				cm.signingKeyKID = kid
 			}
-			cm.signingKeyKID = kid
 		}
 	case jwt.SigningMethodES256, jwt.SigningMethodES384, jwt.SigningMethodES512:
 		cm.validationECDSAByKID = make(map[string]*ecdsa.PublicKey, len(cm.validationKeysECDSA))
@@ -326,22 +328,24 @@ func validateWithKey(cm *CookieManager, tokenString string, key interface{}) (ma
 	return nil, err
 }
 
-// computeKIDFromHMAC returns a stable, short KID for an HMAC key by hashing the raw key with SHA-256
-// and encoding only the first 8 bytes (64 bits) using base64url (no padding).
-func computeKIDFromHMAC(key []byte) string {
-	sum := sha256.Sum256(key)
-	return base64.RawURLEncoding.EncodeToString(sum[:8])
-}
-
 // computeKIDFromPublicKey returns a short KID for a public key by hashing the DER-encoded
-// SubjectPublicKeyInfo with SHA-256 and encoding only the first 8 bytes using base64url (no padding).
+// SubjectPublicKeyInfo with SHA-256 and encoding the first 16 bytes (128 bits) using base64url (no padding).
 func computeKIDFromPublicKey(pk any) (string, error) {
 	der, err := x509.MarshalPKIXPublicKey(pk)
 	if err != nil {
 		return "", err
 	}
 	sum := sha256.Sum256(der)
-	return base64.RawURLEncoding.EncodeToString(sum[:8]), nil
+	return base64.RawURLEncoding.EncodeToString(sum[:16]), nil
+}
+
+// computeKIDFromSaltedHMAC derives a KID for an HMAC key using HMAC-SHA256 with a caller-provided salt,
+// returning base64url encoding of the first 16 bytes (128 bits). This avoids revealing a hash of the raw key.
+func computeKIDFromSaltedHMAC(salt, key []byte) string {
+	mac := hmac.New(sha256.New, salt)
+	mac.Write(key)
+	sum := mac.Sum(nil)
+	return base64.RawURLEncoding.EncodeToString(sum[:16])
 }
 
 // parseKID extracts the kid field from the JWT header without verifying the token.

@@ -49,7 +49,7 @@ func TestSetJWTCookie_IncludesKID_HMAC(t *testing.T) {
 		kid, ok := token.Header["kid"].(string)
 		assert.True(ok, "kid header should be present")
 		assert.NotEmpty(kid)
-		expected := computeKIDFromHMAC(tt.key)
+		expected := computeKIDFromSaltedHMAC(nil, tt.key)
 		assert.Equal(expected, kid)
 	}
 }
@@ -192,7 +192,7 @@ func TestSetJWTCookie_HMAC_SaltedKID(t *testing.T) {
 	kid, ok := token.Header["kid"].(string)
 	assert.True(ok)
 
-	// ensure we changed from unsalted to salted value
-	expectedUnsalted := computeKIDFromHMAC(key)
-	assert.NotEqual(expectedUnsalted, kid)
+	// verify salted derivation matches expected value
+	expectedSalted := computeKIDFromSaltedHMAC([]byte("kid-salt"), key)
+	assert.Equal(expectedSalted, kid)
 }

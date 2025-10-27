@@ -34,10 +34,15 @@ import (
 
 func main() {
 	// Create a cookie manager with secure options
-	 manager := jwtcookie.NewCookieManager(
+     manager := jwtcookie.NewCookieManager(
 	 	jwtcookie.WithSecure(true),
 	 	jwtcookie.WithHTTPOnly(true),
-	 	jwtcookie.WithSigningKeyHMAC([]byte("production-signing-key-that-is-at-least-32-bytes-long")),
+      	// Optional kidSalt (second argument) influences deterministic KID derivation for HMAC keys.
+      	// Use a secret, random salt consistent across instances. Minimum 16 bytes recommended (32 bytes preferred).
+      	jwtcookie.WithSigningKeyHMAC(
+      		[]byte("production-signing-key-that-is-at-least-32-bytes-long"),
+      		[]byte("0123456789abcdef"), // 16-byte salt example; prefer 32 random bytes in production
+      	),
 	 	jwtcookie.WithSigningMethod(jwt.SigningMethodHS256),
 	 	jwtcookie.WithIssuer("https://my-signing-service-url.domain"),
 	 	jwtcookie.WithAudience("https://my-validating-service-url.domain"),
@@ -88,7 +93,8 @@ oldKey := []byte("old-signing-key")
 newKey := []byte("new-signing-key")
 
 manager := jwtcookie.NewCookieManager(
-	jwtcookie.WithSigningKeyHMAC(newKey),  // New key for signing
+	// Use a secret salt of at least 16 bytes (32 preferred) and keep it consistent across instances
+	jwtcookie.WithSigningKeyHMAC(newKey, []byte("0123456789abcdef")),  // 16-byte salt example; prefer 32 random bytes in production
 	jwtcookie.WithValidationKeysHMAC([][]byte{newKey, oldKey}),  // Accept both keys for validation
  	jwtcookie.WithSigningMethod(jwt.SigningMethodHS256),
  	jwtcookie.WithIssuer("your-service-name"),
@@ -182,8 +188,8 @@ The cookie manager supports the following configuration options:
 - `WithDomain(string)` — sets the cookie domain
 - `WithPath(string)` — sets the cookie path
 - `WithCookieName(string)` — sets a custom cookie name
-- `WithSigningKeyHMAC([]byte)`, `WithSigningKeyRSA(*rsa.PrivateKey)`, `WithSigningKeyECDSA(*ecdsa.PrivateKey)` — typed helpers to set the signing key for signing JWTs
-	- For HMAC (HS256, HS384, HS512): use `WithSigningKeyHMAC([]byte)`
+- `WithSigningKeyHMAC([]byte, []byte)`, `WithSigningKeyRSA(*rsa.PrivateKey)`, `WithSigningKeyECDSA(*ecdsa.PrivateKey)` — typed helpers to set the signing key for signing JWTs
+	- For HMAC (HS256, HS384, HS512): use `WithSigningKeyHMAC(key, kidSalt)` where `kidSalt` is optional; pass `nil` for unsalted KID derivation or a non-empty salt to derive the KID as `base64url(HMAC-SHA256(kidSalt, key)[:16])`.
 	- For RSA (RS256, RS384, RS512, PS256, PS384, PS512): use `WithSigningKeyRSA(*rsa.PrivateKey)`
 	- For ECDSA (ES256, ES384, ES512): use `WithSigningKeyECDSA(*ecdsa.PrivateKey)`
 - `WithIssuer(string)`, `WithAudience(string)`, `WithSubject(string)` — required; used for iss/aud/sub claims and enforced during validation
