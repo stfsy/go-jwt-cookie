@@ -61,6 +61,30 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		opt(cm)
 	}
 
+	// Enforce cookie prefix semantics
+	// Custom-supported prefixes:
+	// - __Host-Http-: HttpOnly + __Host- rules
+	// - __Http-: HttpOnly
+	// Standard prefixes:
+	// - __Host-: MUST be Secure, Path=/, and MUST NOT have a Domain attribute
+	// - __Secure-: MUST be Secure (Domain and Path are unconstrained)
+	if strings.HasPrefix(cm.cookieName, "__Host-Http-") {
+		cm.httpOnly = true
+		cm.secure = true
+		cm.path = "/"
+		cm.domain = ""
+	} else if strings.HasPrefix(cm.cookieName, "__Host-") {
+		cm.secure = true
+		cm.path = "/"
+		cm.domain = ""
+	} else if strings.HasPrefix(cm.cookieName, "__Secure-") {
+		cm.secure = true
+	}
+	if strings.HasPrefix(cm.cookieName, "__Http-") {
+		cm.httpOnly = true
+		cm.secure = true
+	}
+
 	// Require standard identity claims to be configured
 	if cm.issuer == "" {
 		return nil, fmt.Errorf("issuer (iss) must be specified")

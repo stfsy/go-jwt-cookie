@@ -238,6 +238,55 @@ Fuzz tests are provided to ensure robustness. Run them with:
 - For HMAC, ensure keys meet minimum sizes (HS256: 32 bytes, HS384: 48 bytes, HS512: 64 bytes)
 - Account for clock skew between services. Consider configuring a small leeway (e.g., 30s) via `WithLeeway(30*time.Second)`.
 
+### Cookie name prefixes
+
+This library enforces standard cookie prefix semantics when the cookie name uses these prefixes: 
+- `__Host-<name>`: cookie is always set with `Secure=true`, `Path=/`, and without a `Domain` attribute. Conflicting options are overridden at construction time.
+- `__Secure-<name>`: cookie is always set with `Secure=true`. `Domain` and `Path` remain as configured.
+- `__Host-Http-<name>`: same as `__Host-` and also forces `HttpOnly=true`.
+- `__Http-<name>`: forces `HttpOnly=true` and `Secure=true`.
+
+Example (`__Host-`):
+
+```go
+manager, err := jwtcookie.NewCookieManager(
+	jwtcookie.WithCookieName("__Host-session"),
+	jwtcookie.WithSecure(false),         // will be set to true
+	jwtcookie.WithDomain("example.com"), // domain won't be set even though provided
+	jwtcookie.WithPath("/sub"),          // will be set to "/"
+	// ... signing method/keys, iss/aud, validation keys
+)
+```
+
+Example (`__Secure-`):
+Example (`__Host-Http-`):
+
+```go
+manager, err := jwtcookie.NewCookieManager(
+	jwtcookie.WithCookieName("__Host-Http-session"),
+	// HttpOnly forced true; Secure true, Path=/, Domain cleared
+)
+```
+
+Example (`__Http-`):
+
+```go
+manager, err := jwtcookie.NewCookieManager(
+	jwtcookie.WithCookieName("__Http-session"),
+	// HttpOnly and Secure forced true; Domain/Path unchanged
+)
+```
+
+```go
+manager, err := jwtcookie.NewCookieManager(
+	jwtcookie.WithCookieName("__Secure-session"),
+	jwtcookie.WithSecure(false),         // will be set to true
+	jwtcookie.WithDomain("example.com"), // domain won't be set even though provided
+	jwtcookie.WithPath("/sub"),          // will be set to "/"
+	// ... signing method/keys, iss/aud, validation keys
+)
+```
+
 ## Contributing
 
 1. Fork the repository and create a branch.
