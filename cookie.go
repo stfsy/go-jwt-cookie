@@ -214,6 +214,17 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 	now := time.Now()
 	claims := make(jwt.MapClaims, len(customClaims)+6)
 
+	// verify all claims are alphanumeric keys and values
+	for k, v := range customClaims {
+		// check key and v are alphanumeric  (incl +,-,_)
+		if !isAlphanumeric(k) {
+			return fmt.Errorf("claim key '%s' contains non-alphanumeric character", k)
+		}
+		if !isAlphanumeric(v) {
+			return fmt.Errorf("claim value '%s' for key '%s' contains non-alphanumeric character", v, k)
+		}
+	}
+
 	// Add custom claims first (may include reserved names); we'll re-assert reserved ones below
 	for key, value := range customClaims {
 		claims[key] = value
