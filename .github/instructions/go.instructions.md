@@ -13,23 +13,36 @@ applyTo: "**/*.go"
 - Creates test cases for all new functions, test happy paths and edge cases.
 
 # Error Handling
-- Handle all errors from functions that are called and return a wrapped error with a concise error message to the callee.
-- For clarity, do not use single-line error handling, always separate the declaration of the error and its check
+- Always check and handle errors returned from called functions. When propagating an error, wrap it with concise, useful context using `fmt.Errorf` and the `%w` verb so callers can inspect the original error (`errors.Is` / `errors.As`).
+- Assign and check errors immediately (the two-line pattern). Do not pre-declare `err` (or result) and assign later — that pattern is error-prone and harder to read.
+- Include actionable context in the wrapping message (what operation failed and any non-sensitive identifiers). Do not include secrets or full tokens in error messages.
+- Keep error checks explicit and readable; avoid hiding checks inside nested expressions or single-line idioms.
 
 ## Preferred Error Handling Style
 ```go
 result, err := someMethod()
 if err != nil {
-    // handle error
+	return nil, fmt.Errorf("someMethod failed: %w", err)
 }
 ```
-- **Do NOT use:**
+
+- **Do NOT use the pre-declare-and-assign-later pattern:**
 ```go
 var err error
 var result SomeType
 result, err = someMethod()
 if err != nil {
-    // handle error
+	// handle error
+}
+```
+
+- When returning wrapped errors, ensure you return the correct zero values for other return types (for example `return nil, fmt.Errorf(...)` when the first return value is a pointer or slice).
+
+- Example of adding helpful context while avoiding secrets:
+```go
+user, err := repo.GetUserByID(ctx, id)
+if err != nil {
+	return nil, fmt.Errorf("get user by id %s: %w", id, err)
 }
 ```
 
