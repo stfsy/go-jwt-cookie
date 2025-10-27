@@ -89,8 +89,12 @@ func WithSubject(subject string) Option {
 // - HS384: at least 48 bytes
 // - HS512: at least 64 bytes
 // The signing key must satisfy the minimum for the configured signing method.
-// If kidSalt is provided and non-empty, HMAC KIDs will be computed as base64url(HMAC-SHA256(kidSalt, key)[:16]);
-// otherwise, base64url(SHA-256(key)[:16]) is used. The salt is normalized to be either nil or non-empty.
+// KID derivation behavior:
+//   - If kidSalt is provided and non-empty, KID = base64url(HMAC-SHA256(kidSalt, key)[:16])
+//   - If kidSalt is nil or empty, KID = base64url(HMAC-SHA256(empty_key, key)[:16]) i.e., HMAC with an empty key
+//     (note: this is NOT plain SHA-256(key)).
+//
+// The salt value is copied into the CookieManager as provided (nil remains nil; empty remains empty).
 func WithSigningKeyHMAC(key []byte, kidSalt []byte) Option {
 	return func(cm *CookieManager) {
 		cm.signingKey = key

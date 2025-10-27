@@ -33,12 +33,12 @@ import (
 )
 
 func main() {
-	// Create a cookie manager with secure options
+    // Create a cookie manager with secure options
      manager := jwtcookie.NewCookieManager(
 	 	jwtcookie.WithSecure(true),
 	 	jwtcookie.WithHTTPOnly(true),
-      	// Optional kidSalt (second argument) influences deterministic KID derivation for HMAC keys.
-      	// Use a secret, random salt consistent across instances. Minimum 16 bytes recommended (32 bytes preferred).
+      	// kidSalt (second argument) is required and influences deterministic KID derivation for HMAC keys.
+      	// Use a secret, random, non-empty salt consistent across instances. Minimum 16 bytes recommended (32 bytes preferred).
       	jwtcookie.WithSigningKeyHMAC(
       		[]byte("production-signing-key-that-is-at-least-32-bytes-long"),
       		[]byte("0123456789abcdef"), // 16-byte salt example; prefer 32 random bytes in production
@@ -189,7 +189,7 @@ The cookie manager supports the following configuration options:
 - `WithPath(string)` — sets the cookie path
 - `WithCookieName(string)` — sets a custom cookie name
 - `WithSigningKeyHMAC([]byte, []byte)`, `WithSigningKeyRSA(*rsa.PrivateKey)`, `WithSigningKeyECDSA(*ecdsa.PrivateKey)` — typed helpers to set the signing key for signing JWTs
-	- For HMAC (HS256, HS384, HS512): use `WithSigningKeyHMAC(key, kidSalt)` where `kidSalt` is optional; pass `nil` for unsalted KID derivation or a non-empty salt to derive the KID as `base64url(HMAC-SHA256(kidSalt, key)[:16])`.
+	- For HMAC (HS256, HS384, HS512): use `WithSigningKeyHMAC(key, kidSalt)` where `kidSalt` is required (non-empty). The KID is derived as `base64url(HMAC-SHA256(kidSalt, key)[:16])`. Use a secret, random salt consistent across instances.
 	- For RSA (RS256, RS384, RS512, PS256, PS384, PS512): use `WithSigningKeyRSA(*rsa.PrivateKey)`
 	- For ECDSA (ES256, ES384, ES512): use `WithSigningKeyECDSA(*ecdsa.PrivateKey)`
 - `WithIssuer(string)`, `WithAudience(string)`, `WithSubject(string)` — required; used for iss/aud/sub claims and enforced during validation

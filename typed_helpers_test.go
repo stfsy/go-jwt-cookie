@@ -20,7 +20,7 @@ func TestTypedHelpers_HMAC_SetFields(t *testing.T) {
 	assert := assert.New(t)
 	// HMAC
 	hmacKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	cm, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 	assert.Equal(hmacKey, cm.signingKey)
 	assert.Equal(jwt.SigningMethodHS256, cm.signingMethod)
@@ -51,7 +51,7 @@ func TestTypedHelpers_ECDSA_SetFields(t *testing.T) {
 func TestTypedHelpers_CookieOptions(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	cmOpts, err := NewCookieManager(WithSecure(false), WithHTTPOnly(false), WithMaxAge(1234), WithSameSite(http.SameSiteLaxMode), WithCookieName("mycookie"), WithSigningKeyHMAC(hmacKey, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cmOpts, err := NewCookieManager(WithSecure(false), WithHTTPOnly(false), WithMaxAge(1234), WithSameSite(http.SameSiteLaxMode), WithCookieName("mycookie"), WithSigningKeyHMAC(hmacKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 	assert.False(cmOpts.secure)
 	assert.False(cmOpts.httpOnly)

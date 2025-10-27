@@ -171,9 +171,17 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 			kid = computeKIDFromSaltedHMAC(cm.kidSalt, k)
 			cm.validationHMACByKID[kid] = k
 		}
-		if sk, ok := cm.signingKey.([]byte); ok && len(sk) > 0 {
-			cm.signingKeyKID = computeKIDFromSaltedHMAC(cm.kidSalt, sk)
+
+		sk, ok := cm.signingKey.([]byte)
+		if !ok {
+			return nil, fmt.Errorf("HMAC signing method requires []byte signing key")
+		} else if len(sk) == 0 {
+			return nil, fmt.Errorf("HMAC signing key cannot be empty")
+		} else if len(cm.kidSalt) == 0 {
+			return nil, fmt.Errorf("HMAC signing key KID derivation requires non-nil kidSalt for salted KID or empty kidSalt for unsalted KID")
 		}
+
+		cm.signingKeyKID = computeKIDFromSaltedHMAC(cm.kidSalt, sk)
 	case jwt.SigningMethodRS256, jwt.SigningMethodRS384, jwt.SigningMethodRS512, jwt.SigningMethodPS256, jwt.SigningMethodPS384, jwt.SigningMethodPS512:
 		cm.validationRSAByKID = make(map[string]*rsa.PublicKey, len(cm.validationKeysRSA))
 		for _, pk := range cm.validationKeysRSA {

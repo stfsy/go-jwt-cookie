@@ -18,7 +18,7 @@ func TestNewCookieManager_Defaults(t *testing.T) {
 
 	signingKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
 	cm, err := NewCookieManager(
-		WithSigningKeyHMAC(signingKey, nil),
+		WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), // example salt (16 bytes)
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{signingKey}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -39,7 +39,7 @@ func TestSetJWTCookie_NilCustomClaims(t *testing.T) {
 	assert := assert.New(t)
 
 	signingKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 
 	w := httptest.NewRecorder()
@@ -65,7 +65,7 @@ func TestSetJWTCookie_CustomCookieOptions(t *testing.T) {
 		WithDomain("example.com"),
 		WithPath("/api"),
 		WithCookieName("custom_jwt"),
-		WithSigningKeyHMAC(signingKey, nil),
+		WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{signingKey}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -96,7 +96,7 @@ func TestSetJWTCookie_TokenSignature(t *testing.T) {
 
 	signingKey1 := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") // 32 bytes
 	signingKey2 := []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") // 32 bytes
-	cm1, err := NewCookieManager(WithSigningKeyHMAC(signingKey1, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey1}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm1, err := NewCookieManager(WithSigningKeyHMAC(signingKey1, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey1}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 
 	w1 := httptest.NewRecorder()
@@ -128,7 +128,7 @@ func TestGetClaimsOfValid_Success(t *testing.T) {
 	assert := assert.New(t)
 
 	signingKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 
 	// First, set a JWT cookie
@@ -174,7 +174,7 @@ func TestGetClaimsOfValid_NoCookie(t *testing.T) {
 	assert := assert.New(t)
 
 	signingKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -187,7 +187,7 @@ func TestGetClaimsOfValid_NoCookie(t *testing.T) {
 func TestGetClaimsOfValid_InvalidToken(t *testing.T) {
 	assert := assert.New(t)
 
-	cm, err := NewCookieManager(WithSigningKeyHMAC([]byte("0123456789abcdef0123456789abcdef"), nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{[]byte("0123456789abcdef0123456789abcdef")}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm, err := NewCookieManager(WithSigningKeyHMAC([]byte("0123456789abcdef0123456789abcdef"), []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{[]byte("0123456789abcdef0123456789abcdef")}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
 
@@ -208,7 +208,7 @@ func TestGetClaimsOfValid_WrongSecretKey(t *testing.T) {
 	signingKey1 := []byte("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa") // 32 bytes
 	signingKey2 := []byte("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb") // 32 bytes
 
-	cm1, err := NewCookieManager(WithSigningKeyHMAC(signingKey1, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey1}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm1, err := NewCookieManager(WithSigningKeyHMAC(signingKey1, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey1}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -220,7 +220,7 @@ func TestGetClaimsOfValid_WrongSecretKey(t *testing.T) {
 	assert.Len(cookies, 1)
 
 	// Try to validate with signingKey2
-	cm2, err := NewCookieManager(WithSigningKeyHMAC(signingKey2, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey2}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm2, err := NewCookieManager(WithSigningKeyHMAC(signingKey2, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey2}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 
 	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -238,7 +238,7 @@ func TestGetClaimsOfValid_KeyRotation(t *testing.T) {
 	newKey := []byte("dddddddddddddddddddddddddddddddd") // 32 bytes
 
 	// Create token with old key
-	cm1, err := NewCookieManager(WithSigningKeyHMAC(oldKey, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{oldKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm1, err := NewCookieManager(WithSigningKeyHMAC(oldKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{oldKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -256,7 +256,7 @@ func TestGetClaimsOfValid_KeyRotation(t *testing.T) {
 
 	// Validate with both old and new keys (key rotation scenario)
 	cm2, err := NewCookieManager(
-		WithSigningKeyHMAC(newKey, nil), // New key for signing
+		WithSigningKeyHMAC(newKey, []byte("0123456789abcdef")), // New key for signing
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{newKey, oldKey}), // Accept both keys for validation
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -283,7 +283,7 @@ func TestGetClaimsOfValid_MultipleValidationKeys(t *testing.T) {
 	key3 := []byte("33333333333333333333333333333333") // 32 bytes
 
 	// Create token with key2
-	cm1, err := NewCookieManager(WithSigningKeyHMAC(key2, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key2}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm1, err := NewCookieManager(WithSigningKeyHMAC(key2, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key2}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 	w := httptest.NewRecorder()
 	r := httptest.NewRequest(http.MethodGet, "/", nil)
@@ -300,7 +300,7 @@ func TestGetClaimsOfValid_MultipleValidationKeys(t *testing.T) {
 
 	// Validate with multiple keys including key2
 	cm2, err := NewCookieManager(
-		WithSigningKeyHMAC(key3, nil),
+		WithSigningKeyHMAC(key3, []byte("0123456789abcdef")),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{key1, key2, key3}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -322,7 +322,7 @@ func TestGetClaimsOfValid_UsesSigningKeyWhenNoValidationKeys(t *testing.T) {
 	assert := assert.New(t)
 
 	signingKey := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
-	cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.NoError(err)
 
 	// Create and set token
@@ -374,7 +374,7 @@ func TestSetJWTCookie_ConfigurableSigningMethod(t *testing.T) {
 		case jwt.SigningMethodHS512:
 			key = []byte("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef") // 64 bytes
 		}
-		cm, err := NewCookieManager(WithSigningKeyHMAC(key, nil), WithSigningMethod(tt.method), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+		cm, err := NewCookieManager(WithSigningKeyHMAC(key, []byte("0123456789abcdef")), WithSigningMethod(tt.method), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 		assert.NoError(err)
 
 		w := httptest.NewRecorder()

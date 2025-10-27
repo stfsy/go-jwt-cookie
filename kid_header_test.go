@@ -29,7 +29,7 @@ func TestSetJWTCookie_IncludesKID_HMAC(t *testing.T) {
 
 	for _, tt := range tests {
 		cm, err := NewCookieManager(
-			WithSigningKeyHMAC(tt.key, nil),
+			WithSigningKeyHMAC(tt.key, []byte("0123456789abcdef")),
 			WithSigningMethod(tt.method),
 			WithValidationKeysHMAC([][]byte{tt.key}),
 			WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -49,7 +49,7 @@ func TestSetJWTCookie_IncludesKID_HMAC(t *testing.T) {
 		kid, ok := token.Header["kid"].(string)
 		assert.True(ok, "kid header should be present")
 		assert.NotEmpty(kid)
-		expected := computeKIDFromSaltedHMAC(nil, tt.key)
+		expected := computeKIDFromSaltedHMAC([]byte("0123456789abcdef"), tt.key)
 		assert.Equal(expected, kid)
 	}
 }
