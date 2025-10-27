@@ -53,7 +53,6 @@ func main() {
 	 	jwtcookie.WithSigningMethod(jwt.SigningMethodHS256),
 	 	jwtcookie.WithIssuer("https://my-signing-service-url.domain"),
 	 	jwtcookie.WithAudience("https://my-validating-service-url.domain"),
-	 	jwtcookie.WithSubject("user-session"),
 	 )
 
 	http.HandleFunc("/login", func(w http.ResponseWriter, r *http.Request) {
@@ -106,7 +105,6 @@ manager := jwtcookie.NewCookieManager(
  	jwtcookie.WithSigningMethod(jwt.SigningMethodHS256),
  	jwtcookie.WithIssuer("your-service-name"),
  	jwtcookie.WithAudience("your-frontend-app"),
- 	jwtcookie.WithSubject("user-session"),
 )
 
 // New tokens will be signed with newKey
@@ -134,7 +132,6 @@ manager := jwtcookie.NewCookieManager(
 	jwtcookie.WithSigningMethod(jwt.SigningMethodRS256),
 	jwtcookie.WithIssuer("your-service-name"),
 	jwtcookie.WithAudience("your-frontend-app"),
-	jwtcookie.WithSubject("user-session"),
 )
 
 // For validation with public keys only
@@ -144,7 +141,6 @@ manager := jwtcookie.NewCookieManager(
 	jwtcookie.WithValidationKeysRSA([]*rsa.PublicKey{&privateKey.PublicKey}),
 	jwtcookie.WithIssuer("your-service-name"),
 	jwtcookie.WithAudience("your-frontend-app"),
-	jwtcookie.WithSubject("user-session"),
 )
 
 // Example: RSA-PSS (RSAPSS) using PS256
@@ -155,7 +151,6 @@ managerPS, _ := jwtcookie.NewCookieManager(
 	jwtcookie.WithValidationKeysRSA([]*rsa.PublicKey{&privateKey.PublicKey}),
 	jwtcookie.WithIssuer("your-service-name"),
 	jwtcookie.WithAudience("your-frontend-app"),
-	jwtcookie.WithSubject("user-session"),
 )
 ```
 
@@ -179,7 +174,6 @@ manager := jwtcookie.NewCookieManager(
 	jwtcookie.WithSigningMethod(jwt.SigningMethodES256),
 	jwtcookie.WithIssuer("your-service-name"),
 	jwtcookie.WithAudience("your-frontend-app"),
-	jwtcookie.WithSubject("user-session"),
 )
 ```
 ```
@@ -199,7 +193,7 @@ The cookie manager supports the following configuration options:
 	- For HMAC (HS256, HS384, HS512): use `WithSigningKeyHMAC(key, kidSalt)` where `kidSalt` is required (non-empty). The KID is derived as `base64url(HMAC-SHA256(kidSalt, key)[:16])`. Use a secret, random salt consistent across instances.
 	- For RSA (RS256, RS384, RS512, PS256, PS384, PS512): use `WithSigningKeyRSA(*rsa.PrivateKey)`
 	- For ECDSA (ES256, ES384, ES512): use `WithSigningKeyECDSA(*ecdsa.PrivateKey)`
-- `WithIssuer(string)`, `WithAudience(string)`, `WithSubject(string)` — required; used for iss/aud/sub claims and enforced during validation
+- `WithIssuer(string)`, `WithAudience(string)`  — required; used for iss/aud/sub claims and enforced during validation
 - `WithValidationKeysHMAC([][]byte)`, `WithValidationKeysRSA([]*rsa.PublicKey)`, `WithValidationKeysECDSA([]*ecdsa.PublicKey)` — typed helpers to set multiple keys for validation (supports key rotation)
 	- For HMAC: pass `WithValidationKeysHMAC([][]byte)`
 	- For RSA: pass `WithValidationKeysRSA([]*rsa.PublicKey)`
@@ -240,7 +234,7 @@ Fuzz tests are provided to ensure robustness. Run them with:
 - Consider using `WithSameSite(http.SameSiteStrictMode)` to prevent CSRF attacks
 - Use a strong signing key for signing JWT tokens
 - Use `WithSigningMethod()` to select an appropriate algorithm (HS256, HS384, HS512; or RS*/PS*/ES*)
-- Provide `WithIssuer`, `WithAudience`, and `WithSubject` and keep them consistent across services; tokens lacking these claims will be rejected.
+- Provide `WithIssuer`, `WithAudience` and keep them consistent across services; tokens lacking these claims will be rejected.
 - For HMAC, ensure keys meet minimum sizes (HS256: 32 bytes, HS384: 48 bytes, HS512: 64 bytes)
 - Account for clock skew between services. Consider configuring a small leeway (e.g., 30s) via `WithLeeway(30*time.Second)`.
 
