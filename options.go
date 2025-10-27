@@ -4,6 +4,7 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"net/http"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
@@ -190,4 +191,21 @@ func WithSigningMethodES384() Option {
 }
 func WithSigningMethodES512() Option {
 	return func(cm *CookieManager) { cm.signingMethod = jwt.SigningMethodES512 }
+}
+
+// WithTimeFunc sets a custom time source for JWT validation. Useful for tests or
+// environments with controlled time sources. If not set, time.Now is used by the
+// jwt library internally. Combine with a small leeway to account for skew.
+func WithTimeFunc(fn func() time.Time) Option {
+	return func(cm *CookieManager) {
+		cm.timeFunc = fn
+	}
+}
+
+// WithLeeway configures a positive leeway duration for validating exp/nbf/iat claims,
+// useful to absorb minor clock skews between services. If d <= 0, no leeway is applied.
+func WithLeeway(d time.Duration) Option {
+	return func(cm *CookieManager) {
+		cm.leeway = d
+	}
 }

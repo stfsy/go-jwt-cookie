@@ -201,6 +201,8 @@ The cookie manager supports the following configuration options:
   - HMAC: HS256 (default), HS384, HS512
   - RSA: RS256, RS384, RS512, PS256, PS384, PS512
   - ECDSA: ES256, ES384, ES512
+- `WithLeeway(time.Duration)` — optionally applies a clock-skew leeway during validation for `exp`/`nbf`/`iat` claims. If unset or <= 0, no leeway is applied. Example: `WithLeeway(30*time.Second)`.
+- `WithTimeFunc(func() time.Time)` — optionally injects a custom time source for validation (useful for tests or controlled environments). When not provided, the default time source is used.
 
 ## Testing
 
@@ -233,6 +235,7 @@ Fuzz tests are provided to ensure robustness. Run them with:
 - Use `WithSigningMethod()` to select an appropriate algorithm (HS256, HS384, HS512; or RS*/PS*/ES*)
 - Provide `WithIssuer`, `WithAudience`, and `WithSubject` and keep them consistent across services; tokens lacking these claims will be rejected.
 - For HMAC, ensure keys meet minimum sizes (HS256: 32 bytes, HS384: 48 bytes, HS512: 64 bytes)
+- Account for clock skew between services. Consider configuring a small leeway (e.g., 30s) via `WithLeeway(30*time.Second)`.
 
 ## Contributing
 

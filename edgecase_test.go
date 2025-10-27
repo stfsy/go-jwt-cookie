@@ -9,7 +9,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -256,4 +258,63 @@ func TestSetJWTCookie_ReservedClaimsCannotOverride(t *testing.T) {
 
 	// Also check role made it through unchanged
 	assert.Equal("user", claims["role"])
+}
+
+// Validate configurable leeway: when no leeway is set, an expired token should be rejected;
+// when a leeway is configured, the same token (expired within leeway) should be accepted.
+func TestGetClaimsOfValid_LeewayBehavior(t *testing.T) {
+	assert := assert.New(t)
+
+	key := bytes.Repeat([]byte{'x'}, 32)
+
+	// Manager without leeway
+	cmNoLeeway, err := NewCookieManager(
+		WithSigningKeyHMAC(key, nil),
+		WithSigningMethodHS256(),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+	)
+	assert.NoError(err)
+
+	// Build a token manually with exp in the past by 5 seconds
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"iss": "iss",
+		"aud": "aud",
+		"sub": "sub",
+		"iat": now.Add(-10 * time.Second).Unix(),
+		"nbf": now.Add(-10 * time.Second).Unix(),
+		"exp": now.Add(-5 * time.Second).Unix(), // expired 5s ago
+		"k":   "v",
+	}
+	tok := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	// match KID behavior so GetClaimsOfValid may try by KID but it's optional
+	tok.Header["kid"] = computeKIDFromSaltedHMAC(nil, key)
+	tokenStr, err := tok.SignedString(key)
+	assert.NoError(err)
+
+	// Request with expired token
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	r.AddCookie(&http.Cookie{Name: "jwt_token", Value: tokenStr})
+
+	_, err = cmNoLeeway.GetClaimsOfValid(r)
+	assert.Error(err, "expected validation error without leeway for expired token")
+
+	// Manager with 10s leeway (greater than 5s expiration offset)
+	cmWithLeeway, err := NewCookieManager(
+		WithSigningKeyHMAC(key, nil),
+		WithSigningMethodHS256(),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithLeeway(10*time.Second),
+		WithTimeFunc(func() time.Time { return now }), // pin time so test is deterministic
+	)
+	assert.NoError(err)
+
+	r2 := httptest.NewRequest(http.MethodGet, "/", nil)
+	r2.AddCookie(&http.Cookie{Name: "jwt_token", Value: tokenStr})
+
+	claimsOut, err := cmWithLeeway.GetClaimsOfValid(r2)
+	assert.NoError(err, "token within leeway should validate")
+	assert.Equal("v", claimsOut["k"])
 }

@@ -40,6 +40,8 @@ type CookieManager struct {
 	validationHMACByKID  map[string][]byte
 	validationRSAByKID   map[string]*rsa.PublicKey
 	validationECDSAByKID map[string]*ecdsa.PublicKey
+	timeFunc             func() time.Time // optional custom time source for parser validations
+	leeway               time.Duration    // optional leeway for time-based validations (exp/nbf/iat)
 }
 
 // NewCookieManager creates a new CookieManager with the given options
@@ -129,12 +131,19 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 	}
 
 	// Build and cache a JWT parser configured with fixed validation options
-	cm.parser = jwt.NewParser(
+	parserOpts := []jwt.ParserOption{
 		jwt.WithValidMethods([]string{cm.signingMethod.Alg()}),
 		jwt.WithIssuer(cm.issuer),
 		jwt.WithAudience(cm.audience),
 		jwt.WithSubject(cm.subject),
-	)
+	}
+	if cm.leeway > 0 {
+		parserOpts = append(parserOpts, jwt.WithLeeway(cm.leeway))
+	}
+	if cm.timeFunc != nil {
+		parserOpts = append(parserOpts, jwt.WithTimeFunc(cm.timeFunc))
+	}
+	cm.parser = jwt.NewParser(parserOpts...)
 
 	// Prepare KID maps for fast lookup
 	switch cm.signingMethod {
