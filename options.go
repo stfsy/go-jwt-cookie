@@ -82,16 +82,18 @@ func WithSubject(subject string) Option {
 }
 
 // Typed signing key helpers for type-safety
-// WithSigningKeyHMAC sets an HMAC signing key (HS256/HS384/HS512).
+// WithSigningKeyHMAC sets an HMAC signing key (HS256/HS384/HS512) and an optional kidSalt for KID derivation.
 // Note: Minimum HMAC key lengths are enforced by NewCookieManager based on the selected method:
 // - HS256: at least 32 bytes
 // - HS384: at least 48 bytes
 // - HS512: at least 64 bytes
 // The signing key must satisfy the minimum for the configured signing method.
-func WithSigningKeyHMAC(key []byte) Option {
+// If kidSalt is provided and non-empty, HMAC KIDs will be computed as base64url(HMAC-SHA256(kidSalt, key)[:16]);
+// otherwise, base64url(SHA-256(key)[:16]) is used. The salt is normalized to be either nil or non-empty.
+func WithSigningKeyHMAC(key []byte, kidSalt []byte) Option {
 	return func(cm *CookieManager) {
 		cm.signingKey = key
-		cm.signingKeyKID = computeKIDFromHMAC(key)
+		cm.kidSalt = append([]byte(nil), kidSalt...)
 	}
 }
 

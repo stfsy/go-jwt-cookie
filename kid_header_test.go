@@ -29,7 +29,7 @@ func TestSetJWTCookie_IncludesKID_HMAC(t *testing.T) {
 
 	for _, tt := range tests {
 		cm, err := NewCookieManager(
-			WithSigningKeyHMAC(tt.key),
+			WithSigningKeyHMAC(tt.key, nil),
 			WithSigningMethod(tt.method),
 			WithValidationKeysHMAC([][]byte{tt.key}),
 			WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -164,4 +164,35 @@ func TestSetJWTCookie_IncludesKID_ECDSA(t *testing.T) {
 		assert.NoError(err)
 		assert.Equal(expected, kid)
 	}
+}
+
+// Ensure salted KID derivation is deterministic and differs from unsalted
+func TestSetJWTCookie_HMAC_SaltedKID(t *testing.T) {
+	assert := assert.New(t)
+
+	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
+
+	cm, err := NewCookieManager(
+		WithSigningKeyHMAC(key, []byte("kid-salt")),
+		WithSigningMethodHS256(),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+	)
+	assert.NoError(err)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodGet, "/", nil)
+	err = cm.SetJWTCookie(w, r, nil)
+	assert.NoError(err)
+
+	tokenStr := w.Result().Cookies()[0].Value
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return key, nil })
+	assert.NoError(err)
+	assert.True(token.Valid)
+	kid, ok := token.Header["kid"].(string)
+	assert.True(ok)
+
+	// ensure we changed from unsalted to salted value
+	expectedUnsalted := computeKIDFromHMAC(key)
+	assert.NotEqual(expectedUnsalted, kid)
 }

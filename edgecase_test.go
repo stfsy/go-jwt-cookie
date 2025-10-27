@@ -20,7 +20,7 @@ func TestNewCookieManager_ValidationErrors(t *testing.T) {
 func TestNewCookieManager_MissingSigningMethod(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
-	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, nil), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.Error(err)
 }
 
@@ -34,7 +34,7 @@ func TestNewCookieManager_MissingSigningKey(t *testing.T) {
 func TestNewCookieManager_MissingValidationKeys(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
-	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey), WithSigningMethodHS256(), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, nil), WithSigningMethodHS256(), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.Error(err)
 }
 
@@ -48,7 +48,7 @@ func TestNewCookieManager_HMACWrongKeyType(t *testing.T) {
 func TestNewCookieManager_RSAWrongSigningKeyType(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
-	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey), WithSigningMethodRS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, nil), WithSigningMethodRS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
 	assert.Error(err)
 }
 
@@ -64,13 +64,13 @@ func TestNewCookieManager_RequiresIssAudSub(t *testing.T) {
 	key := bytes.Repeat([]byte{'x'}, 32)
 
 	// Missing iss
-	_, err := NewCookieManager(WithSigningKeyHMAC(key), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyHMAC(key, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithAudience("aud"), WithSubject("sub"))
 	assert.Error(err)
 	// Missing aud
-	_, err = NewCookieManager(WithSigningKeyHMAC(key), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"), WithSubject("sub"))
+	_, err = NewCookieManager(WithSigningKeyHMAC(key, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"), WithSubject("sub"))
 	assert.Error(err)
 	// Missing sub
-	_, err = NewCookieManager(WithSigningKeyHMAC(key), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"), WithAudience("aud"))
+	_, err = NewCookieManager(WithSigningKeyHMAC(key, nil), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"), WithAudience("aud"))
 	assert.Error(err)
 }
 
@@ -81,7 +81,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 	tooShort256 := bytes.Repeat([]byte{'a'}, 31)
 	ok256 := bytes.Repeat([]byte{'a'}, 32)
 	_, err := NewCookieManager(
-		WithSigningKeyHMAC(tooShort256),
+		WithSigningKeyHMAC(tooShort256, nil),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{ok256}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -89,7 +89,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 	assert.Error(err)
 
 	_, err = NewCookieManager(
-		WithSigningKeyHMAC(ok256),
+		WithSigningKeyHMAC(ok256, nil),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{ok256}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -100,7 +100,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 	tooShort384 := bytes.Repeat([]byte{'b'}, 47)
 	ok384 := bytes.Repeat([]byte{'b'}, 48)
 	_, err = NewCookieManager(
-		WithSigningKeyHMAC(ok384),
+		WithSigningKeyHMAC(ok384, nil),
 		WithSigningMethodHS384(),
 		WithValidationKeysHMAC([][]byte{tooShort384}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -108,7 +108,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 	assert.Error(err)
 
 	_, err = NewCookieManager(
-		WithSigningKeyHMAC(ok384),
+		WithSigningKeyHMAC(ok384, nil),
 		WithSigningMethodHS384(),
 		WithValidationKeysHMAC([][]byte{ok384}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -119,7 +119,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 	tooShort512 := bytes.Repeat([]byte{'c'}, 63)
 	ok512 := bytes.Repeat([]byte{'c'}, 64)
 	_, err = NewCookieManager(
-		WithSigningKeyHMAC(tooShort512),
+		WithSigningKeyHMAC(tooShort512, nil),
 		WithSigningMethodHS512(),
 		WithValidationKeysHMAC([][]byte{ok512}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -127,7 +127,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 	assert.Error(err)
 
 	_, err = NewCookieManager(
-		WithSigningKeyHMAC(ok512),
+		WithSigningKeyHMAC(ok512, nil),
 		WithSigningMethodHS512(),
 		WithValidationKeysHMAC([][]byte{ok512}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
@@ -216,7 +216,7 @@ func TestSetJWTCookie_ReservedClaimsCannotOverride(t *testing.T) {
 
 	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
 	cm, err := NewCookieManager(
-		WithSigningKeyHMAC(key),
+		WithSigningKeyHMAC(key, nil),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{key}),
 		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
