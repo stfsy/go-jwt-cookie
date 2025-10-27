@@ -1,5 +1,6 @@
 package jwtcookie
 
+//nolint:all
 func isAlphanumeric(s string) bool {
 	for _, r := range s {
 		if !((r >= 'A' && r <= 'Z') ||

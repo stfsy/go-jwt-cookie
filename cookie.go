@@ -162,8 +162,7 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		// Compute KID for signing key and validation keys
 		cm.validationHMACByKID = make(map[string][]byte, len(cm.validationKeysHMAC))
 		for _, k := range cm.validationKeysHMAC {
-			var kid string
-			kid = computeKIDFromSaltedHMAC(cm.kidSalt, k)
+			kid := computeKIDFromSaltedHMAC(cm.kidSalt, k)
 			cm.validationHMACByKID[kid] = k
 		}
 
