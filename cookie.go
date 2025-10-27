@@ -291,7 +291,7 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 }
 
 // GetClaimsOfValid validates the JWT token from the request cookie and returns the claims
-func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]any, error) {
+func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (jwt.MapClaims, error) {
 	// Get the cookie from the request
 	cookie, err := r.Cookie(cm.cookieName)
 	if err != nil {
@@ -377,14 +377,14 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]any, erro
 }
 
 // Shared helper to validate with a single key and return claims
-func validateWithKey(cm *CookieManager, tokenString string, key any) (map[string]any, error) {
+func validateWithKey(cm *CookieManager, tokenString string, key any) (jwt.MapClaims, error) {
 	token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (any, error) { return key, nil })
 	if err == nil && token.Valid {
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			return nil, fmt.Errorf("failed to parse claims")
 		}
-		return map[string]any(claims), nil
+		return claims, nil
 	}
 	return nil, err
 }
