@@ -2,6 +2,7 @@ package jwtcookie
 
 import (
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/hmac"
 	"crypto/rsa"
 	"crypto/sha256"
@@ -124,10 +125,25 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		if len(cm.validationKeysECDSA) == 0 {
 			return nil, fmt.Errorf("at least one validation key must be specified")
 		}
-		if _, ok := cm.signingKey.(*ecdsa.PrivateKey); !ok {
+		pk, ok := cm.signingKey.(*ecdsa.PrivateKey)
+		if !ok {
 			return nil, fmt.Errorf("ECDSA signing method requires *ecdsa.PrivateKey signing key")
 		}
-		// validation keys are typed; no runtime checks needed here
+		// Enforce curve matches algorithm to avoid runtime signing mismatches
+		switch cm.signingMethod {
+		case jwt.SigningMethodES256:
+			if pk.Curve != elliptic.P256() {
+				return nil, fmt.Errorf("ES256 requires P-256 key (got %T)", pk.Curve)
+			}
+		case jwt.SigningMethodES384:
+			if pk.Curve != elliptic.P384() {
+				return nil, fmt.Errorf("ES384 requires P-384 key (got %T)", pk.Curve)
+			}
+		case jwt.SigningMethodES512:
+			if pk.Curve != elliptic.P521() {
+				return nil, fmt.Errorf("ES512 requires P-521 key (got %T)", pk.Curve)
+			}
+		}
 	}
 
 	// Build and cache a JWT parser configured with fixed validation options
