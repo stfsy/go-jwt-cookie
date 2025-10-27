@@ -287,6 +287,8 @@ manager, err := jwtcookie.NewCookieManager(
 )
 ```
 
+See [MDN Web Docs on Cookie Prefixes](https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Set-Cookie#cookie_prefixes) for more details.
+
 ## Contributing
 
 1. Fork the repository and create a branch.
