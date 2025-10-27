@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/stfsy/go-jwt-cookie/compare/v1.0.0...v1.1.0) (2025-10-27)
+
+
+### Features
+
+* return types jwt.MapClaims ([9774101](https://github.com/stfsy/go-jwt-cookie/commit/9774101f7bb19e3b57e56596388a7d48dbaae467))
+
 ## 1.0.0 (2025-10-27)
 
 
