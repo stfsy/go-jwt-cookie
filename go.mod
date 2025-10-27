@@ -3,7 +3,7 @@ module github.com/stfsy/go-jwt-cookie
 go 1.24.5
 
 require (
-	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/stretchr/testify v1.11.1
 )
 
