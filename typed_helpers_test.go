@@ -12,10 +12,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestTypedHelpers_SetFields(t *testing.T) {
-	t.Skip("moved to granular tests")
-}
-
 func TestTypedHelpers_HMAC_SetFields(t *testing.T) {
 	assert := assert.New(t)
 	// HMAC

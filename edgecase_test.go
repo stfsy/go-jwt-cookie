@@ -15,10 +15,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestNewCookieManager_ValidationErrors(t *testing.T) {
-	t.Skip("replaced by dedicated tests")
-}
-
 func TestNewCookieManager_MissingSigningMethod(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
