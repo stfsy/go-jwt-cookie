@@ -1,72 +1,44 @@
 # Copilot Coding Agent Instructions — go-jwt-cookie
 
-This repo is a small Go package that implements JWT token generation and HTTP cookie management (package `jwtcookie`). Aim: keep edits minimal, run tests, and respect existing security patterns.
+Scope and intent
+- Single Go package `jwtcookie` for issuing JWTs and setting/reading them via HTTP cookies. Keep edits minimal, preserve security checks, and run tests.
 
 Key files
-- `cookie.go` — core implementation (CookieManager, options, SetJWTCookie, GetClaimsOfValid functions)
-- `cookie_test.go` — unit tests (uses `testify/assert` and `testify/require`)
-- `cookie_fuzz_test.go` — fuzz tests for SetJWTCookie, GetClaimsOfValid, and round-trip testing
-- `test.sh` — runs tests: `go test -cover -timeout 2s ./...`
-- `fuzz.sh` — runs fuzz tests
-- `lint.sh` — runs golangci-lint in Docker
+- `cookie.go` — CookieManager, SetJWTCookie, GetClaimsOfValid, KID logic
+- `options.go` — functional options (`WithXxx`), typed signing/validation helpers, leeway/time
+- `cookie_test.go`, `kid_header_test.go` — unit tests; `cookie_fuzz_test.go` — fuzz tests
+- `test.sh` (vet + tests, 2s timeout), `fuzz.sh`, `lint.sh`
 
-Big picture
-- Single package, no server: the library provides `NewCookieManager(opts...)` which now returns `(*CookieManager, error)` and validates configuration on construction.
-- Internal model: CookieManager holds configuration for cookie attributes (secure, httpOnly, maxAge, sameSite, etc.) and signing keys for signing/validating JWTs.
-- JWT tokens include standard claims (iat, exp, nbf) and custom claims provided by the caller.
-- Supports key rotation: one key for signing, multiple keys for validation.
-- Configurable JWT signing algorithm (HMAC: HS256, HS384, HS512; RSA: RS256, RS384, RS512, PS256, PS384, PS512; ECDSA: ES256, ES384, ES512).
+Architecture and API essentials
+- Construct with `NewCookieManager(opts...) (*CookieManager, error)`; validates config at construction.
+- Required: `WithIssuer(...)`, `WithAudience(...)`, a signing method, a signing key, and at least one typed validation key matching the method (HMAC/RSA/ECDSA).
+- Defaults: cookieName="jwt_token", secure=true, httpOnly=true, maxAge=3600s, sameSite=Strict, path="/".
+- `SetJWTCookie(w, r, custom map[string]string)` adds server-controlled claims `iat/nbf/exp/iss/aud` and refuses any non-alphanumeric claim keys/values (allowed charset: A–Z a–z 0–9 _ + -).
+- `GetClaimsOfValid(r)` reads the cookie, validates strictly against the configured alg/iss/aud using a cached jwt.Parser, tries KID match first, then other validation keys; returns `map[string]interface{}`.
 
-Important behaviors & examples (copy/paste-ready)
-- Default cookie settings: httpOnly=true, secure=true, maxAge=3600 (1 hour), sameSite=Strict, path="/"
-- Default cookie name: "jwt_token"
-- Signing key: set explicitly using typed helpers (see below). The constructor will return an error if signing key/method/validation keys are not correctly provided.
-- `SetJWTCookie` creates a JWT with standard claims and custom claims from the provided map, then sets it as an HTTP cookie
-- `GetClaimsOfValid` validates a JWT token from the request cookie and returns the claims map
-- JWT signing algorithms: 
-  - HMAC: HS256, HS384, HS512
-  - RSA: RS256, RS384, RS512, PS256, PS384, PS512
-  - ECDSA: ES256, ES384, ES512
-- Key rotation: use typed helpers to pass validation keys for rotation
+Signing, KID, and rotation
+- HMAC: min key sizes enforced — HS256≥32B, HS384≥48B, HS512≥64B. KID = base64url(HMAC-SHA256(kidSalt, key)[:16]); kidSalt required (non-empty). Use `WithSigningKeyHMAC(key, kidSalt)` and `WithValidationKeysHMAC([...])`.
+	- Use a cryptographically random salt ≥16 bytes (32 bytes preferred).
+	- Keep the salt consistent across signers/validators; rotating it changes KIDs for new tokens. Old tokens still validate via key iteration, but fast KID lookup is lost until all parties align.
+	- Store salt alongside other secrets (env vars or a secret manager). Don’t hard-code in source or expose to clients.
+- RSA/RSAPSS/ECDSA: use `WithSigningKeyRSA/*ECDSA` and corresponding `WithValidationKeys*`. KID = base64url(SHA-256(SPKI)[:16]). Exact alg match is enforced (e.g., PS256 ≠ RS256).
 
-Typed helpers (preferred)
-- Signing keys:
-  - `WithSigningKeyHMAC([]byte)` — HMAC signing key
-  - `WithSigningKeyRSA(*rsa.PrivateKey)` — RSA private key for signing (RS*/PS*)
-  - `WithSigningKeyECDSA(*ecdsa.PrivateKey)` — ECDSA private key for signing (ES*)
-- Validation keys (key rotation):
-  - `WithValidationKeysHMAC([][]byte)` — HMAC validation keys
-  - `WithValidationKeysRSA([]*rsa.PublicKey)` — RSA public keys for validation
-  - `WithValidationKeysECDSA([]*ecdsa.PublicKey)` — ECDSA public keys for validation
-- Signing methods (typed helpers): `WithSigningMethodHS256()`, `WithSigningMethodRS256()`, `WithSigningMethodPS256()`, `WithSigningMethodES256()`, etc.
-
-Security notes for agents
-- Always recommend using the typed signing-key helpers to set a strong, unique signing key
-- Recommend `WithSecure(true)` for production environments (HTTPS)
-- Recommend `WithHTTPOnly(true)` to prevent XSS attacks
-- Consider `WithSameSite(http.SameSiteStrictMode)` for CSRF protection
-- Recommend appropriate signing algorithm based on security requirements (HS256 is acceptable, HS512/RSAPSS/ES512 for higher assurance)
+Project conventions and patterns
+- Functional options pattern with typed helpers: `WithSigningMethodHS256/RS256/PS256/ES256` etc.; prefer typed validation key helpers for rotation.
+- Claims are simple strings in `SetJWTCookie`; reserved claims from callers are overwritten by server values.
+- Optional time controls: `WithLeeway(d)` for exp/nbf/iat skew, `WithTimeFunc(fn)` for deterministic tests.
+- Tests use `testify` and small RSA keys (1024-bit) to meet the 2s timeout; fuzz tests target cookie set/get.
 
 Developer workflows
 - Build: `go build ./...`
-- Test (quick): `./test.sh` (honors the 2s timeout)
-- Fuzz: `./fuzz.sh` (runs fuzz tests for SetJWTCookie, GetClaimsOfValid, and round-trip)
-- Lint: `./lint.sh` (dockerized golangci-lint)
-- Go version: see `go.mod` (go 1.24.5). Use that or a compatible toolchain.
+- Tests: run `./test.sh` (includes `go vet`; CI adds `-race`).
+- Fuzz: `./fuzz.sh` (per-target with -fuzztime); Lint: `./lint.sh` (dockerized golangci-lint).
+- Go toolchain: see `go.mod` (go 1.24.5) — use a compatible version.
 
-Patterns to follow when editing
-- Keep public API surface minimal: functions/types exported only when needed by consumers.
-- Use the functional options pattern for configuration (see existing `WithXxx` functions)
-- When adding tests, use `testify/assert` and `testify/require` as in existing tests
-- Maintain high test coverage (aim for >80%)
-- Add fuzz tests for any new public functions that accept external input
-- For RSA key generation in tests, use 1024-bit keys to keep tests fast (2s timeout)
+Pitfalls to avoid (common failure modes)
+- Missing iss/aud, missing validation keys, or mismatched alg/keys will error at construction or validation.
+- HMAC keys too short; empty kidSalt; non-alphanumeric custom claim keys/values; ECDSA curve not matching selected ES* method.
 
-Integration points & dependencies
-- `github.com/golang-jwt/jwt/v5` — JWT token generation and signing
-- `github.com/stretchr/testify` — testing utilities
-- No external server or DB; the package is intended to be embedded in HTTP stacks.
-
-Commit guidelines
-- Use Conventional Commits for changes (e.g., `fix(cookie): prevent nil pointer in SetJWTCookie`).
+Commit style
+- Conventional Commits, e.g., `feat(options): add WithLeeway`, `fix(cookie): enforce alphanumeric custom claims`.
 ```
