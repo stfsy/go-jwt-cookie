@@ -22,42 +22,42 @@ func TestNewCookieManager_ValidationErrors(t *testing.T) {
 func TestNewCookieManager_MissingSigningMethod(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
-	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, []byte("0123456789abcdef")), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, []byte("0123456789abcdef")), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"))
 	assert.Error(err)
 }
 
 func TestNewCookieManager_MissingSigningKey(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
-	_, err := NewCookieManager(WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"))
 	assert.Error(err)
 }
 
 func TestNewCookieManager_MissingValidationKeys(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
-	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithIssuer("iss"), WithAudience("aud"))
 	assert.Error(err)
 }
 
 func TestNewCookieManager_HMACWrongKeyType(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
-	_, err := NewCookieManager(WithSigningKeyRSA(&rsa.PrivateKey{}), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyRSA(&rsa.PrivateKey{}), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"))
 	assert.Error(err)
 }
 
 func TestNewCookieManager_RSAWrongSigningKeyType(t *testing.T) {
 	assert := assert.New(t)
 	hmacKey := []byte("k")
-	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, []byte("0123456789abcdef")), WithSigningMethodRS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyHMAC(hmacKey, []byte("0123456789abcdef")), WithSigningMethodRS256(), WithValidationKeysHMAC([][]byte{hmacKey}), WithIssuer("iss"), WithAudience("aud"))
 	assert.Error(err)
 }
 
 func TestNewCookieManager_ECDSAValidationKeysWrongType(t *testing.T) {
 	assert := assert.New(t)
 	priv, _ := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
-	_, err := NewCookieManager(WithSigningKeyECDSA(priv), WithSigningMethodES256(), WithValidationKeysRSA([]*rsa.PublicKey{}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyECDSA(priv), WithSigningMethodES256(), WithValidationKeysRSA([]*rsa.PublicKey{}), WithIssuer("iss"), WithAudience("aud"))
 	assert.Error(err)
 }
 
@@ -66,13 +66,10 @@ func TestNewCookieManager_RequiresIssAudSub(t *testing.T) {
 	key := bytes.Repeat([]byte{'x'}, 32)
 
 	// Missing iss
-	_, err := NewCookieManager(WithSigningKeyHMAC(key, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithAudience("aud"), WithSubject("sub"))
+	_, err := NewCookieManager(WithSigningKeyHMAC(key, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithAudience("aud"))
 	assert.Error(err)
 	// Missing aud
-	_, err = NewCookieManager(WithSigningKeyHMAC(key, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"), WithSubject("sub"))
-	assert.Error(err)
-	// Missing sub
-	_, err = NewCookieManager(WithSigningKeyHMAC(key, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"), WithAudience("aud"))
+	_, err = NewCookieManager(WithSigningKeyHMAC(key, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{key}), WithIssuer("iss"))
 	assert.Error(err)
 }
 
@@ -86,7 +83,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 		WithSigningKeyHMAC(tooShort256, []byte("0123456789abcdef")),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{ok256}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.Error(err)
 
@@ -94,7 +91,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 		WithSigningKeyHMAC(ok256, []byte("0123456789abcdef")),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{ok256}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 
@@ -105,7 +102,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 		WithSigningKeyHMAC(ok384, []byte("0123456789abcdef")),
 		WithSigningMethodHS384(),
 		WithValidationKeysHMAC([][]byte{tooShort384}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.Error(err)
 
@@ -113,7 +110,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 		WithSigningKeyHMAC(ok384, []byte("0123456789abcdef")),
 		WithSigningMethodHS384(),
 		WithValidationKeysHMAC([][]byte{ok384}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 
@@ -124,7 +121,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 		WithSigningKeyHMAC(tooShort512, []byte("0123456789abcdef")),
 		WithSigningMethodHS512(),
 		WithValidationKeysHMAC([][]byte{ok512}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.Error(err)
 
@@ -132,7 +129,7 @@ func TestNewCookieManager_HMACKeyMinLengths(t *testing.T) {
 		WithSigningKeyHMAC(ok512, []byte("0123456789abcdef")),
 		WithSigningMethodHS512(),
 		WithValidationKeysHMAC([][]byte{ok512}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 }
@@ -147,7 +144,7 @@ func TestGetClaimsOfValid_ExactAlgMatchEnforced(t *testing.T) {
 		WithSigningKeyRSA(privRS),
 		WithSigningMethodRS256(),
 		WithValidationKeysRSA([]*rsa.PublicKey{&privRS.PublicKey}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 
@@ -164,7 +161,7 @@ func TestGetClaimsOfValid_ExactAlgMatchEnforced(t *testing.T) {
 		WithSigningKeyRSA(privPS),
 		WithSigningMethodPS256(),
 		WithValidationKeysRSA([]*rsa.PublicKey{&privPS.PublicKey, &privRS.PublicKey}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 
@@ -185,7 +182,7 @@ func TestGetClaimsOfValid_ExactAlgMatchEnforced_Reverse(t *testing.T) {
 		WithSigningKeyRSA(privPS),
 		WithSigningMethodPS256(),
 		WithValidationKeysRSA([]*rsa.PublicKey{&privPS.PublicKey}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 
@@ -202,7 +199,7 @@ func TestGetClaimsOfValid_ExactAlgMatchEnforced_Reverse(t *testing.T) {
 		WithSigningKeyRSA(privRS),
 		WithSigningMethodRS256(),
 		WithValidationKeysRSA([]*rsa.PublicKey{&privRS.PublicKey, &privPS.PublicKey}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 
@@ -221,7 +218,7 @@ func TestSetJWTCookie_ReservedClaimsCannotOverride(t *testing.T) {
 		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{key}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 
@@ -272,7 +269,7 @@ func TestGetClaimsOfValid_LeewayBehavior(t *testing.T) {
 		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{key}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 
@@ -305,7 +302,7 @@ func TestGetClaimsOfValid_LeewayBehavior(t *testing.T) {
 		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{key}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 		WithLeeway(10*time.Second),
 		WithTimeFunc(func() time.Time { return now }), // pin time so test is deterministic
 	)

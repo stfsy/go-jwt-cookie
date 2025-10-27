@@ -20,7 +20,7 @@ func FuzzSetJWTCookie(f *testing.F) {
 			return
 		}
 
-		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"))
 		if err != nil {
 			t.Skip("failed to create cookie manager")
 		}
@@ -76,7 +76,7 @@ func FuzzGetClaimsOfValid(f *testing.F) {
 			WithSigningMethodHS256(),
 			WithValidationKeysHMAC([][]byte{signingKey}),
 			WithCookieName(cookieName),
-			WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+			WithIssuer("iss"), WithAudience("aud"),
 		)
 		if err != nil {
 			t.Skip("failed to create cookie manager")
@@ -116,7 +116,7 @@ func FuzzRoundTrip(f *testing.F) {
 			return
 		}
 
-		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"))
+		cm, err := NewCookieManager(WithSigningKeyHMAC(signingKey, []byte("0123456789abcdef")), WithSigningMethodHS256(), WithValidationKeysHMAC([][]byte{signingKey}), WithIssuer("iss"), WithAudience("aud"))
 		if err != nil {
 			t.Errorf("Failed to create cookie manager: %v", err)
 			return

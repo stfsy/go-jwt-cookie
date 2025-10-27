@@ -28,7 +28,6 @@ type CookieManager struct {
 	cookieName string
 	issuer     string
 	audience   string
-	subject    string
 	signingKey interface{} // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
 	// Typed validation keys for key rotation (avoid boxing/rt type assertions)
 	validationKeysHMAC   [][]byte
@@ -68,9 +67,6 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 	}
 	if cm.audience == "" {
 		return nil, fmt.Errorf("audience (aud) must be specified")
-	}
-	if cm.subject == "" {
-		return nil, fmt.Errorf("subject (sub) must be specified")
 	}
 
 	if cm.signingMethod == nil {
@@ -151,7 +147,6 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 		jwt.WithValidMethods([]string{cm.signingMethod.Alg()}),
 		jwt.WithIssuer(cm.issuer),
 		jwt.WithAudience(cm.audience),
-		jwt.WithSubject(cm.subject),
 	}
 	if cm.leeway > 0 {
 		parserOpts = append(parserOpts, jwt.WithLeeway(cm.leeway))
@@ -230,7 +225,6 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 	claims["exp"] = now.Add(time.Duration(cm.maxAge) * time.Second).Unix() // Expiration time
 	claims["iss"] = cm.issuer                                              // Issuer
 	claims["aud"] = cm.audience                                            // Audience
-	claims["sub"] = cm.subject                                             // Subject
 	// when adding new claims, update also the preallocated map size above
 
 	// Create the JWT token

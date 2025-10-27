@@ -32,7 +32,7 @@ func TestSetJWTCookie_IncludesKID_HMAC(t *testing.T) {
 			WithSigningKeyHMAC(tt.key, []byte("0123456789abcdef")),
 			WithSigningMethod(tt.method),
 			WithValidationKeysHMAC([][]byte{tt.key}),
-			WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+			WithIssuer("iss"), WithAudience("aud"),
 		)
 		assert.NoError(err)
 
@@ -92,7 +92,7 @@ func TestSetJWTCookie_IncludesKID_RSAandPS(t *testing.T) {
 			WithSigningKeyRSA(priv),
 			WithSigningMethod(tt.method),
 			WithValidationKeysRSA([]*rsa.PublicKey{pub}),
-			WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+			WithIssuer("iss"), WithAudience("aud"),
 		)
 		assert.NoError(err)
 
@@ -143,7 +143,7 @@ func TestSetJWTCookie_IncludesKID_ECDSA(t *testing.T) {
 			WithSigningKeyECDSA(tt.private),
 			WithSigningMethod(tt.method),
 			WithValidationKeysECDSA([]*ecdsa.PublicKey{tt.publicKey}),
-			WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+			WithIssuer("iss"), WithAudience("aud"),
 		)
 		assert.NoError(err)
 
@@ -176,7 +176,7 @@ func TestSetJWTCookie_HMAC_SaltedKID(t *testing.T) {
 		WithSigningKeyHMAC(key, []byte("kid-salt")),
 		WithSigningMethodHS256(),
 		WithValidationKeysHMAC([][]byte{key}),
-		WithIssuer("iss"), WithAudience("aud"), WithSubject("sub"),
+		WithIssuer("iss"), WithAudience("aud"),
 	)
 	assert.NoError(err)
 

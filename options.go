@@ -75,13 +75,6 @@ func WithAudience(audience string) Option {
 	}
 }
 
-// WithSubject sets the subject (sub) claim that must be present in tokens
-func WithSubject(subject string) Option {
-	return func(cm *CookieManager) {
-		cm.subject = subject
-	}
-}
-
 // Typed signing key helpers for type-safety
 // WithSigningKeyHMAC sets an HMAC signing key (HS256/HS384/HS512) and an optional kidSalt for KID derivation.
 // Note: Minimum HMAC key lengths are enforced by NewCookieManager based on the selected method:
