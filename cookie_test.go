@@ -108,14 +108,14 @@ func TestSetJWTCookie_TokenSignature(t *testing.T) {
 	token1 := w1.Result().Cookies()[0].Value
 
 	// Token signed with signingKey1 should be valid with signingKey1
-	parsedToken1, err := jwt.Parse(token1, func(token *jwt.Token) (interface{}, error) {
+	parsedToken1, err := jwt.Parse(token1, func(token *jwt.Token) (any, error) {
 		return signingKey1, nil
 	})
 	assert.NoError(err)
 	assert.True(parsedToken1.Valid)
 
 	// Token signed with signingKey1 should NOT be valid with signingKey2
-	parsedToken2, err := jwt.Parse(token1, func(token *jwt.Token) (interface{}, error) {
+	parsedToken2, err := jwt.Parse(token1, func(token *jwt.Token) (any, error) {
 		return signingKey2, nil
 	})
 	assert.Error(err)
@@ -382,7 +382,7 @@ func TestSetJWTCookie_ConfigurableSigningMethod(t *testing.T) {
 		err = cm.SetJWTCookie(w, r, map[string]string{"alg": tt.wantAlg})
 		assert.NoError(err)
 
-		token, err := jwt.Parse(w.Result().Cookies()[0].Value, func(token *jwt.Token) (interface{}, error) { return key, nil })
+		token, err := jwt.Parse(w.Result().Cookies()[0].Value, func(token *jwt.Token) (any, error) { return key, nil })
 		assert.NoError(err)
 		assert.Equal(tt.wantAlg, token.Header["alg"])
 	}
@@ -414,7 +414,7 @@ func TestSetJWTCookie_RSAAlgorithm(t *testing.T) {
 	cookies := w.Result().Cookies()
 	assert.Len(cookies, 1)
 
-	token, err := jwt.Parse(cookies[0].Value, func(token *jwt.Token) (interface{}, error) { return &privateKey.PublicKey, nil })
+	token, err := jwt.Parse(cookies[0].Value, func(token *jwt.Token) (any, error) { return &privateKey.PublicKey, nil })
 	assert.NoError(err)
 	assert.True(token.Valid)
 	assert.Equal("RS256", token.Header["alg"])
@@ -448,7 +448,7 @@ func TestSetJWTCookie_ECDSAAlgorithm(t *testing.T) {
 	cookies := w.Result().Cookies()
 	assert.Len(cookies, 1)
 
-	token, err := jwt.Parse(cookies[0].Value, func(token *jwt.Token) (interface{}, error) { return &privateKey.PublicKey, nil })
+	token, err := jwt.Parse(cookies[0].Value, func(token *jwt.Token) (any, error) { return &privateKey.PublicKey, nil })
 	assert.NoError(err)
 	assert.True(token.Valid)
 	assert.Equal("ES256", token.Header["alg"])

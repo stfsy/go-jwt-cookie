@@ -42,7 +42,7 @@ func TestSetJWTCookie_IncludesKID_HMAC(t *testing.T) {
 		assert.NoError(err)
 
 		tokenStr := w.Result().Cookies()[0].Value
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return tt.key, nil })
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) { return tt.key, nil })
 		assert.NoError(err)
 		assert.True(token.Valid)
 
@@ -102,7 +102,7 @@ func TestSetJWTCookie_IncludesKID_RSAandPS(t *testing.T) {
 		assert.NoError(err)
 
 		tokenStr := w.Result().Cookies()[0].Value
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return pub, nil })
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) { return pub, nil })
 		assert.NoError(err)
 		assert.True(token.Valid)
 
@@ -153,7 +153,7 @@ func TestSetJWTCookie_IncludesKID_ECDSA(t *testing.T) {
 		assert.NoError(err)
 
 		tokenStr := w.Result().Cookies()[0].Value
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return tt.publicKey, nil })
+		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) { return tt.publicKey, nil })
 		assert.NoError(err)
 		assert.True(token.Valid)
 
@@ -186,7 +186,7 @@ func TestSetJWTCookie_HMAC_SaltedKID(t *testing.T) {
 	assert.NoError(err)
 
 	tokenStr := w.Result().Cookies()[0].Value
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) { return key, nil })
+	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (any, error) { return key, nil })
 	assert.NoError(err)
 	assert.True(token.Valid)
 	kid, ok := token.Header["kid"].(string)

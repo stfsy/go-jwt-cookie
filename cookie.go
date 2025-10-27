@@ -28,7 +28,7 @@ type CookieManager struct {
 	cookieName string
 	issuer     string
 	audience   string
-	signingKey interface{} // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
+	signingKey any // Used for signing ([]byte for HMAC, *rsa.PrivateKey for RSA, *ecdsa.PrivateKey for ECDSA)
 	// Typed validation keys for key rotation (avoid boxing/rt type assertions)
 	validationKeysHMAC   [][]byte
 	validationKeysRSA    []*rsa.PublicKey
@@ -267,7 +267,7 @@ func (cm *CookieManager) SetJWTCookie(w http.ResponseWriter, r *http.Request, cu
 }
 
 // GetClaimsOfValid validates the JWT token from the request cookie and returns the claims
-func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface{}, error) {
+func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]any, error) {
 	// Get the cookie from the request
 	cookie, err := r.Cookie(cm.cookieName)
 	if err != nil {
@@ -353,14 +353,14 @@ func (cm *CookieManager) GetClaimsOfValid(r *http.Request) (map[string]interface
 }
 
 // Shared helper to validate with a single key and return claims
-func validateWithKey(cm *CookieManager, tokenString string, key interface{}) (map[string]interface{}, error) {
-	token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (interface{}, error) { return key, nil })
+func validateWithKey(cm *CookieManager, tokenString string, key any) (map[string]any, error) {
+	token, err := cm.parser.Parse(tokenString, func(token *jwt.Token) (any, error) { return key, nil })
 	if err == nil && token.Valid {
 		claims, ok := token.Claims.(jwt.MapClaims)
 		if !ok {
 			return nil, fmt.Errorf("failed to parse claims")
 		}
-		return map[string]interface{}(claims), nil
+		return map[string]any(claims), nil
 	}
 	return nil, err
 }
@@ -396,7 +396,7 @@ func parseKID(token string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	var header map[string]interface{}
+	var header map[string]any
 	if err := json.Unmarshal(headerJSON, &header); err != nil {
 		return "", err
 	}
