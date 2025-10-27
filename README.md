@@ -1,14 +1,21 @@
 # go-jwt-cookie
 
-A lightweight Go package for creating JWT tokens and setting them as HTTP cookies with configurable security options.
+An opinionated Go package for creating JWT tokens and setting them as HTTP cookies with configurable security options.
 
-This library is intended to be embedded into HTTP servers for authentication and session management. It offers:
+This library is intended to support your existing **session management**. It offers:
 
-- JWT token generation with standard and custom claims
+- JWT token signing with standard and custom claims
 - JWT token validation and claims extraction
-- Configurable cookie options (secure, httpOnly, sameSite, etc.)
-- Secret key rotation support for seamless key updates
+- Configurable cookie options (Secure, HttpOnly, SameSite, etc.)
+- Signing key rotation support for seamless key updates
 - Simple constructor-based configuration pattern
+
+The library itself does not provide any **session management** mechanism for managing session metadata, invalidation, or expiration.
+
+## Why use it
+In most web applications you need to manage user sessions. Storing a session ID in a signed JWT in an HTTP-only, Secure cookie allows you to verify the integrity of the JWT directly on the server (without a database lookup). Thus, you can safely reject tampered tokens without needing to query a backend store.
+
+This approach doesn’t prevent you from storing session metadata in a database. In fact, combining both is recommended: keep a server-side session record so you can invalidate sessions, track activity, and implement logout and forced expiration. Note that JWTs are signed, not encrypted—don’t place secrets in claims.
 
 ## Installation
 
