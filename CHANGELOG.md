@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/stfsy/go-jwt-cookie/compare/v1.2.0...v1.3.0) (2026-04-09)
+
+
+### Features
+
+* copy validation and signing keys ([2d8e885](https://github.com/stfsy/go-jwt-cookie/commit/2d8e8852ce4b93731489c38c59d6602bfec51ab9))
+
 ## [1.2.0](https://github.com/stfsy/go-jwt-cookie/compare/v1.1.0...v1.2.0) (2026-04-09)
 
 
