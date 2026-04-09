@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/stfsy/go-jwt-cookie/compare/v1.1.0...v1.2.0) (2026-04-09)
+
+
+### Features
+
+* update claim requirements ([d35a937](https://github.com/stfsy/go-jwt-cookie/commit/d35a93718aecac23245c0881caeacea881f76e85))
+
 ## [1.1.0](https://github.com/stfsy/go-jwt-cookie/compare/v1.0.0...v1.1.0) (2025-10-27)
 
 
