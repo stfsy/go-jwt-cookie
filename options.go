@@ -90,7 +90,7 @@ func WithAudience(audience string) Option {
 // The salt value is copied into the CookieManager as provided (nil remains nil; empty remains empty).
 func WithSigningKeyHMAC(key []byte, kidSalt []byte) Option {
 	return func(cm *CookieManager) {
-		cm.signingKey = key
+		cm.signingKey = append([]byte(nil), key...)
 		cm.kidSalt = append([]byte(nil), kidSalt...)
 	}
 }
@@ -120,7 +120,11 @@ func WithSigningKeyECDSA(key *ecdsa.PrivateKey) Option {
 // All validation keys must satisfy the minimum for the configured signing method.
 func WithValidationKeysHMAC(keys [][]byte) Option {
 	return func(cm *CookieManager) {
-		cm.validationKeysHMAC = keys
+		copied := make([][]byte, len(keys))
+		for i := range keys {
+			copied[i] = append([]byte(nil), keys[i]...)
+		}
+		cm.validationKeysHMAC = copied
 	}
 }
 
