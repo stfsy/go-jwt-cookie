@@ -10,6 +10,11 @@ This library is intended to support your existing **session management**. It off
 - Signing key rotation support for seamless key updates
 - Simple constructor-based configuration pattern
 
+Custom claim limitation:
+- `SetJWTCookie` currently accepts custom claims as `map[string]string` only.
+- Custom claim keys and values must be valid UTF-8 and contain only: `A-Z`, `a-z`, `0-9`, `_`, `+`, `#`, `-`.
+- Characters such as spaces, `.`, `/`, `@`, `:` and other punctuation are rejected.
+
 The library itself does not provide any **session management** mechanism for managing session metadata, invalidation, or expiration.
 
 ## Why use it
@@ -61,6 +66,7 @@ func main() {
 			"user_id": "12345",
 			"role":    "admin",
 		}
+		// Note: claim keys/values must be valid UTF-8 and limited to [A-Za-z0-9_+#-].
 
 		// Set JWT cookie
 		err := manager.SetJWTCookie(w, r, claims)
@@ -237,6 +243,7 @@ Fuzz tests are provided to ensure robustness. Run them with:
 - Provide `WithIssuer`, `WithAudience` and keep them consistent across services; tokens lacking these claims will be rejected.
 - For HMAC, ensure keys meet minimum sizes (HS256: 32 bytes, HS384: 48 bytes, HS512: 64 bytes)
 - Account for clock skew between services. Consider configuring a small leeway (e.g., 30s) via `WithLeeway(30*time.Second)`.
+- Custom claims are restricted to string keys/values with valid UTF-8 and character set `[A-Za-z0-9_+#-]`.
 
 ### Cookie name prefixes
 
