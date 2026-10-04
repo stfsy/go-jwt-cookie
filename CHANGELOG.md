@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/stfsy/go-jwt-cookie/compare/v1.3.0...v1.4.0) (2026-10-04)
+
+
+### Features
+
+* strictly validate cookie configuration ([94f24fe](https://github.com/stfsy/go-jwt-cookie/commit/94f24fe854d35b33b2aef57f33218a8d6ce4e2a8))
+
 ## [1.3.0](https://github.com/stfsy/go-jwt-cookie/compare/v1.2.0...v1.3.0) (2026-04-09)
 
 
