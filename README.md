@@ -248,9 +248,9 @@ Fuzz tests are provided to ensure robustness. Run them with:
 ### Cookie name prefixes
 
 This library enforces standard cookie prefix semantics when the cookie name uses these prefixes: 
-- `__Host-<name>`: cookie is always set with `Secure=true`, `Path=/`, and without a `Domain` attribute. Conflicting options are overridden at construction time.
+- `__Host-<name>`: cookie must be set with `Secure=true`, `Path=/`, and without a `Domain` attribute. Conflicting options (`WithDomain`, `WithSecure(false)`, `WithPath` other than `"/"`) cause `NewCookieManager` to return an error.
 - `__Secure-<name>`: cookie is always set with `Secure=true`. `Domain` and `Path` remain as configured.
-- `__Host-Http-<name>`: same as `__Host-` and also forces `HttpOnly=true`.
+- `__Host-Http-<name>`: same as `__Host-` (rejects conflicting options) and also forces `HttpOnly=true`.
 - `__Http-<name>`: forces `HttpOnly=true` and `Secure=true`.
 
 Example (`__Host-`):
@@ -258,9 +258,7 @@ Example (`__Host-`):
 ```go
 manager, err := jwtcookie.NewCookieManager(
 	jwtcookie.WithCookieName("__Host-session"),
-	jwtcookie.WithSecure(false),         // will be set to true
-	jwtcookie.WithDomain("example.com"), // domain won't be set even though provided
-	jwtcookie.WithPath("/sub"),          // will be set to "/"
+	// Note: passing WithDomain, WithSecure(false), or WithPath != "/" will return an error
 	// ... signing method/keys, iss/aud, validation keys
 )
 ```

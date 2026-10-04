@@ -68,15 +68,21 @@ func NewCookieManager(opts ...Option) (*CookieManager, error) {
 	// Standard prefixes:
 	// - __Host-: MUST be Secure, Path=/, and MUST NOT have a Domain attribute
 	// - __Secure-: MUST be Secure (Domain and Path are unconstrained)
+	isHostCookie := strings.HasPrefix(cm.cookieName, "__Host-") || strings.HasPrefix(cm.cookieName, "__Host-Http-")
+	if isHostCookie {
+		if cm.domain != "" {
+			return nil, fmt.Errorf("cookie name prefix __Host- prohibits setting Domain attribute")
+		}
+		if !cm.secure {
+			return nil, fmt.Errorf("cookie name prefix __Host- requires Secure attribute to be true")
+		}
+		if cm.path != "/" {
+			return nil, fmt.Errorf("cookie name prefix __Host- requires Path attribute to be \"/\"")
+		}
+	}
+
 	if strings.HasPrefix(cm.cookieName, "__Host-Http-") {
 		cm.httpOnly = true
-		cm.secure = true
-		cm.path = "/"
-		cm.domain = ""
-	} else if strings.HasPrefix(cm.cookieName, "__Host-") {
-		cm.secure = true
-		cm.path = "/"
-		cm.domain = ""
 	} else if strings.HasPrefix(cm.cookieName, "__Secure-") {
 		cm.secure = true
 	}

@@ -13,12 +13,11 @@ func TestCookiePrefix_Host(t *testing.T) {
 	assert := assert.New(t)
 
 	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
+
+	// Valid __Host- configuration
 	cm, err := NewCookieManager(
 		WithCookieName("__Host-jwt"),
-		WithDomain("example.com"), // should be cleared
-		WithPath("/subpath"),      // should be forced to "/"
-		WithHTTPOnly(false),       // should remain as-is (spec doesn't require HttpOnly)
-		WithSecure(false),         // should be forced to true
+		WithHTTPOnly(false), // should remain as-is (spec doesn't require HttpOnly)
 		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
 		WithSigningMethod(jwt.SigningMethodHS256),
 		WithValidationKeysHMAC([][]byte{key}),
@@ -44,6 +43,48 @@ func TestCookiePrefix_Host(t *testing.T) {
 	assert.True(c.Secure)
 	assert.Equal("/", c.Path)
 	assert.Equal("", c.Domain)
+}
+
+func TestCookiePrefix_Host_FailFastConflicts(t *testing.T) {
+	assert := assert.New(t)
+
+	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
+
+	// Conflicting WithDomain
+	_, err := NewCookieManager(
+		WithCookieName("__Host-jwt"),
+		WithDomain("example.com"),
+		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
+		WithSigningMethod(jwt.SigningMethodHS256),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"),
+	)
+	assert.Error(err)
+	assert.Contains(err.Error(), "Domain")
+
+	// Conflicting WithSecure(false)
+	_, err = NewCookieManager(
+		WithCookieName("__Host-jwt"),
+		WithSecure(false),
+		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
+		WithSigningMethod(jwt.SigningMethodHS256),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"),
+	)
+	assert.Error(err)
+	assert.Contains(err.Error(), "Secure")
+
+	// Conflicting WithPath("/subpath")
+	_, err = NewCookieManager(
+		WithCookieName("__Host-jwt"),
+		WithPath("/subpath"),
+		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
+		WithSigningMethod(jwt.SigningMethodHS256),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"),
+	)
+	assert.Error(err)
+	assert.Contains(err.Error(), "Path")
 }
 
 func TestCookiePrefix_Secure(t *testing.T) {
@@ -88,10 +129,7 @@ func TestCookiePrefix_HostHttp(t *testing.T) {
 	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
 	cm, err := NewCookieManager(
 		WithCookieName("__Host-Http-session"),
-		WithHTTPOnly(false),       // should be forced to true
-		WithSecure(false),         // should be forced to true
-		WithDomain("example.com"), // should be cleared
-		WithPath("/sub"),          // should be forced to "/"
+		WithHTTPOnly(false), // should be forced to true
 		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
 		WithSigningMethod(jwt.SigningMethodHS256),
 		WithValidationKeysHMAC([][]byte{key}),
@@ -115,6 +153,48 @@ func TestCookiePrefix_HostHttp(t *testing.T) {
 	assert.True(c.Secure)
 	assert.Equal("/", c.Path)
 	assert.Equal("", c.Domain)
+}
+
+func TestCookiePrefix_HostHttp_FailFastConflicts(t *testing.T) {
+	assert := assert.New(t)
+
+	key := []byte("0123456789abcdef0123456789abcdef") // 32 bytes
+
+	// Conflicting WithDomain
+	_, err := NewCookieManager(
+		WithCookieName("__Host-Http-session"),
+		WithDomain("example.com"),
+		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
+		WithSigningMethod(jwt.SigningMethodHS256),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"),
+	)
+	assert.Error(err)
+	assert.Contains(err.Error(), "Domain")
+
+	// Conflicting WithSecure(false)
+	_, err = NewCookieManager(
+		WithCookieName("__Host-Http-session"),
+		WithSecure(false),
+		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
+		WithSigningMethod(jwt.SigningMethodHS256),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"),
+	)
+	assert.Error(err)
+	assert.Contains(err.Error(), "Secure")
+
+	// Conflicting WithPath("/sub")
+	_, err = NewCookieManager(
+		WithCookieName("__Host-Http-session"),
+		WithPath("/sub"),
+		WithSigningKeyHMAC(key, []byte("0123456789abcdef")),
+		WithSigningMethod(jwt.SigningMethodHS256),
+		WithValidationKeysHMAC([][]byte{key}),
+		WithIssuer("iss"), WithAudience("aud"),
+	)
+	assert.Error(err)
+	assert.Contains(err.Error(), "Path")
 }
 
 func TestCookiePrefix_Http(t *testing.T) {
