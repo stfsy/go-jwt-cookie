@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.1](https://github.com/stfsy/go-jwt-cookie/compare/v1.4.0...v1.4.1) (2026-10-23)
+
+
+### Miscellaneous Chores
+
+* standardize release-please and stale workflows ([2e095e1](https://github.com/stfsy/go-jwt-cookie/commit/2e095e112694e5cfce14aebd2f68f8915f0c0189))
+* standardize release-please and stale workflows ([337429c](https://github.com/stfsy/go-jwt-cookie/commit/337429cd71b520ea7bb2e6d1981f0108c5fdda98))
+
 ## [1.4.0](https://github.com/stfsy/go-jwt-cookie/compare/v1.3.0...v1.4.0) (2026-10-04)
 
 
